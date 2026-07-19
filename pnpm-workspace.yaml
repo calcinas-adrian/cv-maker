@@ -1,0 +1,13 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+
+# Force a single zod resolution across the whole dependency graph.
+# `shadcn` (CLI-only, not used at runtime) pulls in zod@3.x transitively via
+# @modelcontextprotocol/sdk, which duplicates zod's internal `zod/v4/core`
+# module and breaks @hookform/resolvers' zodResolver type-checking (its
+# `$ZodTypeInternals` version tag no longer matches ours). See features/cv
+# section forms for the zodResolver usage this fixes.
+overrides:
+  zod: ^4.4.3

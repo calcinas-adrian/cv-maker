@@ -1,0 +1,194 @@
+import { create } from "zustand"
+import { temporal } from "zundo"
+import { throttle } from "es-toolkit"
+import type {
+  CvData,
+  EducationItem,
+  ExperienceItem,
+  ProjectItem,
+  SkillItem,
+} from "@/schemas/cv.schema"
+
+type SectionKey = "experiences" | "projects" | "education" | "skills"
+
+type Direction = "up" | "down"
+
+type EditorState = {
+  draft: CvData | null
+  hydrate: (cv: CvData) => void
+  updateSection: (patch: Partial<CvData>) => void
+
+  addExperience: (item: ExperienceItem) => void
+  updateExperience: (id: string, patch: Partial<ExperienceItem>) => void
+  removeExperience: (id: string) => void
+  moveExperience: (id: string, direction: Direction) => void
+
+  addProject: (item: ProjectItem) => void
+  updateProject: (id: string, patch: Partial<ProjectItem>) => void
+  removeProject: (id: string) => void
+  moveProject: (id: string, direction: Direction) => void
+
+  addEducation: (item: EducationItem) => void
+  updateEducation: (id: string, patch: Partial<EducationItem>) => void
+  removeEducation: (id: string) => void
+  moveEducation: (id: string, direction: Direction) => void
+
+  addSkill: (item: SkillItem) => void
+  updateSkill: (id: string, patch: Partial<SkillItem>) => void
+  removeSkill: (id: string) => void
+  moveSkill: (id: string, direction: Direction) => void
+}
+
+// Stable references for "not hydrated yet" selector fallbacks. A literal
+// `[] `inline in a selector (`s.draft?.experiences ?? []`) allocates a new
+// array on every call, and `useSyncExternalStore` (which zustand's
+// `useStore` is built on) compares snapshots with `Object.is` — a fresh
+// array every time looks like a perpetual change and triggers React's
+// "getSnapshot should be cached" loop-detection warning/error. Reusing
+// these constants keeps the empty case referentially stable.
+export const EMPTY_EXPERIENCES: ExperienceItem[] = []
+export const EMPTY_PROJECTS: ProjectItem[] = []
+export const EMPTY_EDUCATION: EducationItem[] = []
+export const EMPTY_SKILLS: SkillItem[] = []
+
+function withSection<K extends SectionKey>(
+  draft: CvData,
+  key: K,
+  updater: (items: CvData[K]) => CvData[K],
+): CvData {
+  return { ...draft, [key]: updater(draft[key]) }
+}
+
+function moveItem<T extends { id: string }>(
+  items: T[],
+  id: string,
+  direction: Direction,
+): T[] {
+  const index = items.findIndex((item) => item.id === id)
+  if (index === -1) return items
+
+  const swapWith = direction === "up" ? index - 1 : index + 1
+  if (swapWith < 0 || swapWith >= items.length) return items
+
+  const next = [...items]
+  ;[next[index], next[swapWith]] = [next[swapWith], next[index]]
+  return next
+}
+
+export const useEditorStore = create<EditorState>()(
+  temporal(
+    (set) => ({
+      draft: null,
+
+      hydrate: (cv) => set({ draft: cv }),
+
+      updateSection: (patch) =>
+        set((s) => ({ draft: { ...s.draft!, ...patch } })),
+
+      addExperience: (item) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "experiences", (items) => [
+            ...items,
+            item,
+          ]),
+        })),
+      updateExperience: (id, patch) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "experiences", (items) =>
+            items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+          ),
+        })),
+      removeExperience: (id) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "experiences", (items) =>
+            items.filter((it) => it.id !== id),
+          ),
+        })),
+      moveExperience: (id, direction) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "experiences", (items) =>
+            moveItem(items, id, direction),
+          ),
+        })),
+
+      addProject: (item) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "projects", (items) => [...items, item]),
+        })),
+      updateProject: (id, patch) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "projects", (items) =>
+            items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+          ),
+        })),
+      removeProject: (id) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "projects", (items) =>
+            items.filter((it) => it.id !== id),
+          ),
+        })),
+      moveProject: (id, direction) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "projects", (items) =>
+            moveItem(items, id, direction),
+          ),
+        })),
+
+      addEducation: (item) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "education", (items) => [
+            ...items,
+            item,
+          ]),
+        })),
+      updateEducation: (id, patch) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "education", (items) =>
+            items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+          ),
+        })),
+      removeEducation: (id) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "education", (items) =>
+            items.filter((it) => it.id !== id),
+          ),
+        })),
+      moveEducation: (id, direction) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "education", (items) =>
+            moveItem(items, id, direction),
+          ),
+        })),
+
+      addSkill: (item) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "skills", (items) => [...items, item]),
+        })),
+      updateSkill: (id, patch) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "skills", (items) =>
+            items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+          ),
+        })),
+      removeSkill: (id) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "skills", (items) =>
+            items.filter((it) => it.id !== id),
+          ),
+        })),
+      moveSkill: (id, direction) =>
+        set((s) => ({
+          draft: withSection(s.draft!, "skills", (items) =>
+            moveItem(items, id, direction),
+          ),
+        })),
+    }),
+    {
+      limit: 100,
+      // Only the CV draft itself enters the undo stack — UI state (which
+      // dialog is open, autosave status, etc.) never does.
+      partialize: (s) => ({ draft: s.draft }),
+      handleSet: (handleSet) => throttle(handleSet, 400),
+    },
+  ),
+)
