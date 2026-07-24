@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { CvData } from "@/schemas/cv.schema"
+import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { AutosaveIndicator } from "./autosave-indicator"
 import { useEditorStore } from "./editor-store"
 import { BasicInfoCard } from "./sections/basic-info-card"
@@ -14,6 +14,10 @@ import { SkillSection } from "./sections/skill-section"
 import { useAutosave } from "./use-autosave"
 import { useUndoRedoShortcuts } from "./use-undo-redo-shortcuts"
 import { VersionHistory } from "./version-history"
+import { ThemePicker } from "./theme/theme-picker"
+import { YamlPanel } from "./yaml/yaml-panel"
+
+type ContentView = "form" | "yaml"
 
 /**
  * Renders ONLY the form sections, into the middle ("editor") panel of
@@ -36,12 +40,17 @@ export function CvEditor({
   cvId,
   initialData,
   initialUpdatedAt,
+  initialTheme,
 }: {
   cvId: string
   initialData: CvData
   initialUpdatedAt: string
+  initialTheme: CvTheme
 }) {
   const hydrate = useEditorStore((s) => s.hydrate)
+  const setTheme = useEditorStore((s) => s.setTheme)
+  const draft = useEditorStore((s) => s.draft)
+  const [activeView, setActiveView] = useState<ContentView>("form")
 
   useEffect(() => {
     // Hydrate once on mount from the server-provided initial data only.
@@ -64,6 +73,9 @@ export function CvEditor({
     hydrate(initialData)
     temporal.resume()
     temporal.clear()
+    // `theme` is already outside `partialize` (never undo-tracked), so this
+    // needs no pause/resume — see `editor-store.ts`.
+    setTheme(initialTheme)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -85,14 +97,56 @@ export function CvEditor({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        <BasicInfoCard />
-        <ExperienceSection />
-        <ProjectSection cvId={cvId} />
-        <EducationSection />
-        <SkillSection />
-        <VersionHistory cvId={cvId} />
+      {/*
+        Theme picker + form/YAML toggle live in their own bar, OUTSIDE the
+        `activeView` branch below, so theme stays editable regardless of
+        which content view is active (theme is presentation, orthogonal to
+        content — design Decision 2) and the toggle itself is always
+        reachable. Both live INSIDE this single "editor" panel — no new
+        resizable Group, per the hard constraint carried from Phase 4's
+        fix (see `cv-workspace-shell.tsx`).
+      */}
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b p-4">
+        <ThemePicker cvId={cvId} />
+        <div className="flex items-center gap-1 rounded-md border p-0.5">
+          <Button
+            type="button"
+            variant={activeView === "form" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveView("form")}
+          >
+            Formulario
+          </Button>
+          <Button
+            type="button"
+            variant={activeView === "yaml" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveView("yaml")}
+          >
+            YAML
+          </Button>
+        </div>
       </div>
+
+      {activeView === "form" ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+          <BasicInfoCard />
+          <ExperienceSection />
+          <ProjectSection cvId={cvId} />
+          <EducationSection />
+          <SkillSection />
+          <VersionHistory cvId={cvId} />
+        </div>
+      ) : (
+        // `draft` is only null before the mount effect's `hydrate` runs — a
+        // one-tick window the user cannot reach this toggle during (it's
+        // rendered by the same component, after that effect has had a
+        // chance to fire on the very first commit). Guarded anyway so
+        // `YamlPanel` never receives a null draft.
+        <div className="min-h-0 flex-1 p-4">
+          {draft ? <YamlPanel draft={draft} /> : null}
+        </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { createRequire } from "node:module"
 import { getCvDraft } from "@/features/cv/actions"
+import { getCvTheme } from "@/features/cv/theme/actions"
 import type { Result } from "@/lib/result"
 import { DEFAULT_THEME } from "@/schemas/cv.schema"
 import { toTypstPayload, toThemePayload } from "@/features/render/typst-payload"
@@ -96,13 +97,23 @@ export async function renderCvPdf(cvId: string): Promise<Result<CvPdfRender>> {
 
   const templateSource = await getTemplateSource()
   const payload = toTypstPayload(draft.data)
-  // Per-CV theme selection isn't read here yet — that lands in Phase 5,
-  // once `getCvDraft`/`findOwnedCv` is wired to surface `cv.theme`. Until
-  // then this always resolves to `DEFAULT_THEME`, whose values equal
-  // `classic.typ`'s current hardcoded literals, so today's output is
-  // unaffected. This establishes the `themeJson` channel now so Phase 2's
-  // template parametrization doesn't require another `actions.ts` change.
-  const themeJson = JSON.stringify(toThemePayload(DEFAULT_THEME))
+  // Sibling read (see `getCvTheme`'s header comment) — falls back to
+  // `DEFAULT_THEME` on failure too, not just on a null `cv.theme` column:
+  // ownership was already confirmed by the `getCvDraft` call above, so a
+  // failure here is only a defensive edge case (e.g. the row vanishing
+  // between the two reads), not an expected path. Logged (unlike the
+  // fallback value itself, which is intentionally safe to serve) so a
+  // theme silently not matching what the user set is still traceable.
+  const themeResult = await getCvTheme(cvId)
+  if (!themeResult.ok) {
+    console.error(
+      "Failed to read CV theme, falling back to default",
+      cvId,
+      themeResult.error,
+    )
+  }
+  const theme = themeResult.ok ? themeResult.data : DEFAULT_THEME
+  const themeJson = JSON.stringify(toThemePayload(theme))
 
   try {
     const buffer = await getRenderer().render({

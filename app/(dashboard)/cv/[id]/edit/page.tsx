@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { cv, education, experience, project, skill } from "@/db/schema"
-import type { CvData } from "@/schemas/cv.schema"
+import { DEFAULT_THEME, type CvData } from "@/schemas/cv.schema"
 import { CvEditor } from "@/features/cv/cv-editor"
 
 /**
@@ -109,6 +109,7 @@ export default async function EditCvPage({
       cvId={id}
       initialData={initialData}
       initialUpdatedAt={cvRow.updatedAt.toISOString()}
+      initialTheme={cvRow.theme ?? DEFAULT_THEME}
     />
   )
 }

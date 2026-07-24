@@ -101,18 +101,35 @@ export type CvRenderData = z.infer<typeof cvRenderSchema>
  * `NULL`) fall back to, and its values equal today's hardcoded
  * `templates/classic.typ` literals so existing rows render unchanged.
  */
+// Exported so UI-side bounds (e.g. `<input min/max>` in the theme picker)
+// derive from the same numbers the schema validates against, instead of a
+// second hand-copied set of magic numbers that can silently drift out of
+// sync with what `saveTheme` actually accepts.
+export const THEME_FONT_SIZE_MIN = 8
+export const THEME_FONT_SIZE_MAX = 12
+export const THEME_LINE_HEIGHT_MIN = 0.4
+export const THEME_LINE_HEIGHT_MAX = 0.8
+
 export const themeSchema = z.object({
   // Must stay a subset of `features/render/font-manifest.ts` (added in
   // Phase 2) — the client and server must only ever offer fonts bundled on
   // both sides.
   fontFamily: z.enum(["New Computer Modern"]).default("New Computer Modern"),
-  fontSize: z.number().min(8).max(12).default(10), // pt
+  fontSize: z
+    .number()
+    .min(THEME_FONT_SIZE_MIN)
+    .max(THEME_FONT_SIZE_MAX)
+    .default(10), // pt
   accentColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .default("#000000"),
   margin: z.enum(["compact", "normal", "relaxed"]).default("normal"),
-  lineHeight: z.number().min(0.4).max(0.8).default(0.55), // em leading
+  lineHeight: z
+    .number()
+    .min(THEME_LINE_HEIGHT_MIN)
+    .max(THEME_LINE_HEIGHT_MAX)
+    .default(0.55), // em leading
 })
 
 export type CvTheme = z.infer<typeof themeSchema>

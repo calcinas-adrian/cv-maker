@@ -1,12 +1,14 @@
 import { create } from "zustand"
 import { temporal } from "zundo"
 import { throttle } from "es-toolkit"
-import type {
-  CvData,
-  EducationItem,
-  ExperienceItem,
-  ProjectItem,
-  SkillItem,
+import {
+  DEFAULT_THEME,
+  type CvData,
+  type CvTheme,
+  type EducationItem,
+  type ExperienceItem,
+  type ProjectItem,
+  type SkillItem,
 } from "@/schemas/cv.schema"
 
 type SectionKey = "experiences" | "projects" | "education" | "skills"
@@ -17,6 +19,17 @@ type EditorState = {
   draft: CvData | null
   hydrate: (cv: CvData) => void
   updateSection: (patch: Partial<CvData>) => void
+  // Coarse-grained write for the YAML commit path (5.4): one replacement of
+  // the whole draft, as opposed to the granular per-field/per-item actions
+  // below. Goes through the same undo-tracked `set` as everything else, so
+  // a YAML commit is one undo step.
+  replaceDraft: (data: CvData) => void
+
+  // Presentation, not content — deliberately OUTSIDE `partialize` below, so
+  // theme changes never enter the undo stack (see `sdd/cv-editor-panel/design`
+  // Decision 2).
+  theme: CvTheme
+  setTheme: (theme: CvTheme) => void
 
   addExperience: (item: ExperienceItem) => void
   updateExperience: (id: string, patch: Partial<ExperienceItem>) => void
@@ -81,6 +94,10 @@ export const useEditorStore = create<EditorState>()(
       draft: null,
 
       hydrate: (cv) => set({ draft: cv }),
+      replaceDraft: (data) => set({ draft: data }),
+
+      theme: DEFAULT_THEME,
+      setTheme: (theme) => set({ theme }),
 
       updateSection: (patch) =>
         set((s) => ({ draft: { ...s.draft!, ...patch } })),

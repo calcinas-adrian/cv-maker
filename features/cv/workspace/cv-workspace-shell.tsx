@@ -8,7 +8,6 @@ import {
 } from "react-resizable-panels"
 import { usePersistedPanelLayout } from "@/hooks/use-persisted-panel-layout"
 import { TypstPreviewLazy } from "@/features/render/typst-preview-lazy"
-import { DEFAULT_THEME } from "@/schemas/cv.schema"
 import { useEditorStore } from "@/features/cv/editor-store"
 import type { CvListItem } from "@/features/cv/list"
 import { CvListSidebar } from "./cv-list-sidebar"
@@ -86,6 +85,7 @@ export function CvWorkspaceShell({
   const { defaultLayout, onLayoutChange } =
     usePersistedPanelLayout("cv-workspace")
   const draft = useEditorStore((s) => s.draft)
+  const theme = useEditorStore((s) => s.theme)
 
   return (
     <ResizablePanelGroup
@@ -110,11 +110,7 @@ export function CvWorkspaceShell({
       <ResizableHandle className={RESIZABLE_HANDLE_CLASSNAME} />
       <ResizablePanel id="preview" defaultSize="35%" minSize="320px">
         {draft ? (
-          <TypstPreviewLazy
-            data={draft}
-            theme={DEFAULT_THEME}
-            className="h-full"
-          />
+          <TypstPreviewLazy data={draft} theme={theme} className="h-full" />
         ) : (
           <div className="text-muted-foreground flex h-full items-center justify-center p-8 text-sm">
             Cargando…
