@@ -1,9 +1,8 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import Link from "next/link"
 import { auth } from "@/lib/auth"
 import { listUserCvs } from "@/features/cv/list"
-import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { DashboardCvList } from "@/features/cv/dashboard-cv-list"
 import { ImportFromFileDialog } from "@/features/cv-import/import-from-file-dialog"
 import { AddPasskeyButton } from "./add-passkey-button"
 import { CreateCvButton } from "./create-cv-button"
@@ -37,17 +36,7 @@ export default async function DashboardPage() {
           Todavía no tenés CVs — creá el primero.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {cvs.map((item) => (
-            <Link key={item.id} href={`/cv/${item.id}/edit`}>
-              <Card className="hover:bg-muted/50 transition-colors">
-                <CardHeader>
-                  <CardTitle>{item.title}</CardTitle>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <DashboardCvList cvs={cvs} />
       )}
     </div>
   )

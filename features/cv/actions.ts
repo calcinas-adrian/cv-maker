@@ -31,6 +31,37 @@ export async function createCv(title: string): Promise<Result<{ id: string }>> {
 }
 
 /**
+ * Renames a CV — deliberately does NOT touch `cv.updatedAt`, same reasoning
+ * as `saveTheme` (see `features/cv/theme/actions.ts`): a title change is
+ * metadata, not a content edit, so it must never conflict with `saveDraft`'s
+ * optimistic-concurrency check on content.
+ */
+export async function renameCv(
+  cvId: string,
+  title: string,
+): Promise<Result<{ title: string }>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const owned = await findOwnedCv(cvId, userId)
+  if (!owned) return { ok: false, error: "No encontrado", code: "not_found" }
+
+  const trimmed = title.trim()
+  if (!trimmed) {
+    return {
+      ok: false,
+      error: "El título no puede estar vacío",
+      code: "invalid_input",
+    }
+  }
+
+  await db.update(cv).set({ title: trimmed }).where(eq(cv.id, cvId))
+
+  return { ok: true, data: { title: trimmed } }
+}
+
+/**
  * Reads the full CvData shape for a cv, verifying ownership first.
  *
  * Used internally by `saveVersion` to build a snapshot. The `/cv/[id]/edit`

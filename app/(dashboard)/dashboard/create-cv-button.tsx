@@ -11,7 +11,14 @@ export function CreateCvButton() {
 
   async function handleCreate() {
     setIsLoading(true)
-    const result = await createCv("CV sin título")
+    const createdAt = new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date())
+    const result = await createCv(`CV sin título — ${createdAt}`)
     setIsLoading(false)
     if (result.ok) {
       router.push(`/cv/${result.data.id}/edit`)
