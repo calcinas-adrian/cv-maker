@@ -6,7 +6,7 @@ import {
   integer,
   jsonb,
 } from "drizzle-orm/pg-core"
-import type { CvData } from "@/schemas/cv.schema"
+import type { CvData, CvTheme } from "@/schemas/cv.schema"
 
 /**
  * Better Auth core tables — user, session, account, verification — plus the
@@ -109,6 +109,12 @@ export const cv = pgTable("cv", {
   phone: text("phone"),
   location: text("location"),
   summary: text("summary"),
+  // Nullable, no DB default: NULL means "no theme chosen yet". Both render
+  // paths (client preview + server export) coalesce NULL -> DEFAULT_THEME
+  // at read time, whose values equal today's hardcoded classic.typ
+  // literals, so pre-existing rows render byte-identically to before this
+  // column existed. See sdd/cv-editor-panel/design Decision 2 + Migration.
+  theme: jsonb("theme").$type<CvTheme>(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })

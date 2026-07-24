@@ -1,10 +1,8 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { desc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
-import { db } from "@/db"
-import { cv } from "@/db/schema"
+import { listUserCvs } from "@/features/cv/list"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImportFromFileDialog } from "@/features/cv-import/import-from-file-dialog"
 import { AddPasskeyButton } from "./add-passkey-button"
@@ -19,13 +17,9 @@ export default async function DashboardPage() {
     redirect("/login")
   }
 
-  // Ownership is implicit here: only rows matching the session's userId
-  // are ever selected.
-  const cvs = await db
-    .select()
-    .from(cv)
-    .where(eq(cv.userId, session.user.id))
-    .orderBy(desc(cv.updatedAt))
+  // Ownership is implicit here: `listUserCvs` scopes by the session's
+  // userId. Shared with the `/cv/*` sidebar — see `features/cv/list.ts`.
+  const cvs = await listUserCvs(session.user.id)
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">

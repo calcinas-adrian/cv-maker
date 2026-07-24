@@ -22,6 +22,13 @@
       "when": 1783490700966,
       "tag": "0002_spooky_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784506273438,
+      "tag": "0003_light_tiger_shark",
+      "breakpoints": true
     }
   ]
 }

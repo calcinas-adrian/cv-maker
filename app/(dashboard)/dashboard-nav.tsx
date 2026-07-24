@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LogOutIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { signOut } from "@/lib/auth-client"
 
 const NAV_LINKS = [
@@ -48,6 +49,7 @@ export function DashboardNav() {
             <LogOutIcon />
             Cerrar sesión
           </Button>
+          <ThemeToggle />
         </nav>
       </div>
     </header>

@@ -97,7 +97,15 @@ export default async function EditCvPage({
   }
 
   return (
+    // `key={id}` forces a clean unmount+remount of `CvEditor` on every CV
+    // switch — required because `editor-store` is a module-level singleton
+    // and the persistent `/cv/*` sidebar layout does not remount on
+    // sibling-route navigation, so without this key the previous CV's
+    // hydrated draft, autosave concurrency ref, and undo history would
+    // otherwise leak into the newly opened CV. See
+    // `sdd/cv-editor-panel/design` Decision 1 addendum.
     <CvEditor
+      key={id}
       cvId={id}
       initialData={initialData}
       initialUpdatedAt={cvRow.updatedAt.toISOString()}

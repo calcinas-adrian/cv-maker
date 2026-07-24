@@ -3,7 +3,8 @@ import path from "path"
 import { createRequire } from "node:module"
 import { getCvDraft } from "@/features/cv/actions"
 import type { Result } from "@/lib/result"
-import type { CvData } from "@/schemas/cv.schema"
+import { DEFAULT_THEME } from "@/schemas/cv.schema"
+import { toTypstPayload, toThemePayload } from "@/features/render/typst-payload"
 // Type-only — erased at compile time, so this alone never triggers the
 // runtime ESM resolution that hits the broken `.mjs` build below.
 import type { Typst as TypstRenderer } from "typst-raster"
@@ -58,51 +59,6 @@ function getRenderer(): TypstRenderer {
 }
 
 /**
- * Flattens `CvData` into the plain, all-keys-guaranteed-present shape
- * `templates/classic.typ` expects.
- *
- * This step matters for more than convenience: `JSON.stringify` silently
- * *drops* keys whose value is `undefined` (which is how most optional
- * `CvData` fields end up when empty), and the template's
- * `data.at("key", default: ...)` lookups only fall back to `default` when
- * the key is missing — not when it's present with a nullish value. Every
- * field here is therefore coerced to a concrete `""` / `[]` before
- * serialization so the template's field access never has to guess.
- */
-function toTypstPayload(cv: CvData) {
-  return {
-    fullName: cv.fullName ?? "",
-    email: cv.email ?? "",
-    phone: cv.phone ?? "",
-    location: cv.location ?? "",
-    summary: cv.summary ?? "",
-    experiences: (cv.experiences ?? []).map((e) => ({
-      company: e.company ?? "",
-      role: e.role ?? "",
-      startDate: e.startDate ?? "",
-      endDate: e.endDate ?? "",
-      bullets: e.bullets ?? [],
-    })),
-    projects: (cv.projects ?? []).map((p) => ({
-      name: p.name ?? "",
-      description: p.description ?? "",
-      url: p.url ?? "",
-      bullets: p.bullets ?? [],
-    })),
-    education: (cv.education ?? []).map((ed) => ({
-      institution: ed.institution ?? "",
-      degree: ed.degree ?? "",
-      startDate: ed.startDate ?? "",
-      endDate: ed.endDate ?? "",
-    })),
-    skills: (cv.skills ?? []).map((s) => ({
-      name: s.name ?? "",
-      category: s.category ?? "",
-    })),
-  }
-}
-
-/**
  * Builds a filesystem/HTTP-header-safe download filename from a CV's full
  * name, e.g. "María José Fernández Núñez" -> "Maria_Jose_Fernandez_Nunez_CV.pdf".
  *
@@ -140,17 +96,26 @@ export async function renderCvPdf(cvId: string): Promise<Result<CvPdfRender>> {
 
   const templateSource = await getTemplateSource()
   const payload = toTypstPayload(draft.data)
+  // Per-CV theme selection isn't read here yet — that lands in Phase 5,
+  // once `getCvDraft`/`findOwnedCv` is wired to surface `cv.theme`. Until
+  // then this always resolves to `DEFAULT_THEME`, whose values equal
+  // `classic.typ`'s current hardcoded literals, so today's output is
+  // unaffected. This establishes the `themeJson` channel now so Phase 2's
+  // template parametrization doesn't require another `actions.ts` change.
+  const themeJson = JSON.stringify(toThemePayload(DEFAULT_THEME))
 
   try {
     const buffer = await getRenderer().render({
       code: templateSource,
       format: "pdf",
-      // The only channel CV data travels through into Typst: a single
-      // JSON-encoded string, decoded on the other side with
-      // `json.decode(sys.inputs.cvData)`. This is what keeps user-controlled
-      // text from ever being string-interpolated into compiled Typst
-      // source — see the security note at the top of classic.typ.
-      variables: { cvData: JSON.stringify(payload) },
+      // The only channels CV data/theme travel through into Typst: two
+      // JSON-encoded strings, decoded on the other side with
+      // `json.decode(sys.inputs.cvData)` / `sys.inputs.themeJson`. This is
+      // what keeps user-controlled text from ever being string-interpolated
+      // into compiled Typst source — see the security note at the top of
+      // classic.typ. `classic.typ` does not read `themeJson` yet (Phase 2);
+      // an unread extra input is inert and does not change render output.
+      variables: { cvData: JSON.stringify(payload), themeJson },
     })
 
     return {

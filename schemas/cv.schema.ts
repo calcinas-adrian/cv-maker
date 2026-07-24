@@ -86,3 +86,35 @@ export const cvRenderSchema = cvDataSchema.extend({
 })
 
 export type CvRenderData = z.infer<typeof cvRenderSchema>
+
+/**
+ * CV presentation theme — kept as a SIBLING schema, deliberately not folded
+ * into `cvDataSchema`.
+ *
+ * Theme is presentation, orthogonal to content: extending `cvDataSchema`
+ * would ride `saveDraft`'s cv-row update path AND land in `cv_version`
+ * snapshots, so theme changes would wrongly capture as content versions.
+ * See `sdd/cv-editor-panel/design` Decision 2.
+ *
+ * Every field has a zod `.default(...)` so `DEFAULT_THEME` is always fully
+ * concrete — this is what pre-existing CVs (whose `cv.theme` column is
+ * `NULL`) fall back to, and its values equal today's hardcoded
+ * `templates/classic.typ` literals so existing rows render unchanged.
+ */
+export const themeSchema = z.object({
+  // Must stay a subset of `features/render/font-manifest.ts` (added in
+  // Phase 2) — the client and server must only ever offer fonts bundled on
+  // both sides.
+  fontFamily: z.enum(["New Computer Modern"]).default("New Computer Modern"),
+  fontSize: z.number().min(8).max(12).default(10), // pt
+  accentColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default("#000000"),
+  margin: z.enum(["compact", "normal", "relaxed"]).default("normal"),
+  lineHeight: z.number().min(0.4).max(0.8).default(0.55), // em leading
+})
+
+export type CvTheme = z.infer<typeof themeSchema>
+
+export const DEFAULT_THEME: CvTheme = themeSchema.parse({})

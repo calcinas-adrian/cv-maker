@@ -2,11 +2,19 @@
 //
 // SECURITY: the entire CV payload arrives as a single JSON-encoded string
 // via `sys.inputs.cvData` (see `features/render/actions.ts`), decoded here
-// with `json.decode`. User-controlled text (name, bullets, summaries, etc.)
-// therefore only ever exists as Typst *data* (str/array/dictionary values).
-// Interpolating a `str` value with `#value` always inserts literal text —
-// Typst never re-parses it as markup or source — so this file must NEVER
-// string-interpolate raw CV text into template source. Do not change this.
+// with `json.decode`. Theme tokens travel the same way through a second,
+// symmetric `sys.inputs.themeJson` channel. User-controlled text (name,
+// bullets, summaries, etc.) therefore only ever exists as Typst *data*
+// (str/array/dictionary values). Interpolating a `str` value with `#value`
+// always inserts literal text — Typst never re-parses it as markup or
+// source — so this file must NEVER string-interpolate raw CV text into
+// template source. Do not change this. `md-inline` (below) parses a
+// LIMITED bold/italic markdown subset out of bullet text, but it does so
+// entirely by slicing the `str` value with string methods (`.position()`
+// / `.slice()`) and re-inserting the resulting fragments via `[#frag]` —
+// never by feeding user text back into Typst's own markup parser. A
+// crafted bullet like `#set text(size: 999pt)` or containing `#`/`\`/`"`
+// is therefore always inert plain-text data, never executed Typst code.
 
 #let data = json.decode(sys.inputs.cvData)
 
@@ -27,10 +35,35 @@
 #let education = data.at("education", default: ())
 #let skills = data.at("skills", default: ())
 
+// -- Theme ---------------------------------------------------------------
+//
+// `themeJson` is decoded the same way as `cvData` above — every value that
+// reaches the template is Typst *data*, never source. Defaults here match
+// `schemas/cv.schema.ts`'s `DEFAULT_THEME` (and, before this file was
+// parametrized, this template's own hardcoded literals) so a caller that
+// omits `themeJson` entirely, or a caller that only sends a partial theme
+// dictionary, still renders byte-identically to today's fixed look.
+#let theme = json.decode(sys.inputs.at("themeJson", default: "{}"))
+#let theme-font = theme.at("fontFamily", default: "New Computer Modern")
+#let theme-font-size = theme.at("fontSize", default: 10)
+#let theme-accent = rgb(theme.at("accentColor", default: "#000000"))
+#let theme-margin-key = theme.at("margin", default: "normal")
+#let theme-line-height = theme.at("lineHeight", default: 0.55)
+
+// `margin` travels as its enum tag ("compact" | "normal" | "relaxed"), not
+// a resolved length — this map is the one place that tag is turned into
+// actual cm values. `normal` MUST stay exactly `(x: 1.6cm, y: 1.4cm)`: that
+// is today's hardcoded margin, and `DEFAULT_THEME.margin` is `"normal"`.
+#let margin-map = (
+  compact: (x: 1.2cm, y: 1.0cm),
+  normal: (x: 1.6cm, y: 1.4cm),
+  relaxed: (x: 2.2cm, y: 2.0cm),
+)
+
 #set document(title: if full-name != "" { full-name } else { "CV" })
-#set page(paper: "a4", margin: (x: 1.6cm, y: 1.4cm))
-#set text(font: "New Computer Modern", size: 10pt)
-#set par(justify: false, leading: 0.55em)
+#set page(paper: "a4", margin: margin-map.at(theme-margin-key, default: margin-map.normal))
+#set text(font: theme-font, size: theme-font-size * 1pt)
+#set par(justify: false, leading: theme-line-height * 1em)
 
 // -- Helpers -----------------------------------------------------------
 
@@ -49,9 +82,74 @@
   else []
 }
 
+// Data-only inline markdown: turns a plain `str` into Typst *content* by
+// locating **bold** and _italic_ delimiter pairs with string search
+// (`.position()` / `.slice()`), never by re-feeding the string into
+// Typst's own markup parser. Every fragment — matched or not — reaches
+// the page only via `[#frag]`, where `frag` is a runtime `str` value;
+// Typst always inserts that as literal text, so a bullet containing `#`,
+// `\`, `"`, or Typst-like syntax (e.g. `#set text(size: 999pt)`) can never
+// execute — it can only ever end up as inert characters on the page. See
+// the SECURITY note at the top of this file.
+//
+// Deliberately simple (no nesting, no escaping `\*`/`\_`): matches the
+// design's documented algorithm. One known, non-security quirk: a single
+// pair of underscores around a `snake_case_identifier` will be read as
+// italic markup, same as most minimal markdown parsers.
+#let md-inline(input) = {
+  let remaining = input
+  let out = ()
+  while remaining.len() > 0 {
+    let bold-pos = remaining.position("**")
+    let italic-pos = remaining.position("_")
+
+    let next-marker = if bold-pos != none and (italic-pos == none or bold-pos <= italic-pos) {
+      "bold"
+    } else if italic-pos != none {
+      "italic"
+    } else {
+      none
+    }
+
+    if next-marker == none {
+      out.push([#remaining])
+      remaining = ""
+    } else if next-marker == "bold" {
+      let before = remaining.slice(0, bold-pos)
+      let after-open = remaining.slice(bold-pos + 2)
+      let close-pos = after-open.position("**")
+      if close-pos == none {
+        // Unterminated "**" — keep the rest as literal text, do not
+        // silently swallow the marker.
+        out.push([#remaining])
+        remaining = ""
+      } else {
+        let inner = after-open.slice(0, close-pos)
+        if before.len() > 0 { out.push([#before]) }
+        out.push(strong[#inner])
+        remaining = after-open.slice(close-pos + 2)
+      }
+    } else {
+      let before = remaining.slice(0, italic-pos)
+      let after-open = remaining.slice(italic-pos + 1)
+      let close-pos = after-open.position("_")
+      if close-pos == none {
+        out.push([#remaining])
+        remaining = ""
+      } else {
+        let inner = after-open.slice(0, close-pos)
+        if before.len() > 0 { out.push([#before]) }
+        out.push(emph[#inner])
+        remaining = after-open.slice(close-pos + 1)
+      }
+    }
+  }
+  if out.len() > 0 { out.join() } else { [] }
+}
+
 #let bullet-list(bullets) = {
   if bullets.len() > 0 {
-    list(..bullets.map(b => [#b]), indent: 0.4em, spacing: 0.4em)
+    list(..bullets.map(b => md-inline(b)), indent: 0.4em, spacing: 0.4em)
   }
 }
 
@@ -67,7 +165,7 @@
 // -- Header --------------------------------------------------------------
 
 #align(center)[
-  #text(size: 20pt, weight: "bold")[
+  #text(size: 20pt, weight: "bold", fill: theme-accent)[
     #if full-name != "" { full-name } else { "Untitled CV" }
   ]
 ]
