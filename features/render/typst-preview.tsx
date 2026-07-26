@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { toTypstPayload, toThemePayload } from "@/features/render/typst-payload"
 import { compilePreview } from "@/features/render/typst-client"
+import { DocumentSkeleton } from "@/features/render/cv-preview-skeleton"
 
 /**
  * Live Typst preview pane. Standalone and reusable on purpose: it takes
@@ -111,8 +112,17 @@ export default function TypstPreview({
       ) : null}
 
       {isCompiling && !svg ? (
-        <div className="text-muted-foreground flex h-full items-center justify-center p-8 text-sm">
-          Generando vista previa…
+        <div className="relative h-full overflow-hidden">
+          <DocumentSkeleton
+            experienceCount={data.experiences.length}
+            projectCount={data.projects.length}
+            educationCount={data.education.length}
+            skillCount={data.skills.length}
+            className="h-full"
+          />
+          <div className="text-muted-foreground absolute inset-x-0 bottom-4 text-center text-xs">
+            Generando vista previa…
+          </div>
         </div>
       ) : null}
 

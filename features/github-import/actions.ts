@@ -240,6 +240,22 @@ export async function extractFromRepo(
       },
     }
   } catch (err) {
+    // Log only a minimal, safe subset — never the raw error object (it can
+    // carry `requestBodyValues`/`responseBody`) and never the api key. Same
+    // discipline as `features/ai-providers/actions.ts`'s
+    // `validateProviderKey`.
+    const cause = unwrapRetryError(err)
+    console.error(
+      "AI project/experience extraction from repo failed",
+      typeof modelResult.data.model === "string"
+        ? modelResult.data.model
+        : modelResult.data.model.provider,
+      APICallError.isInstance(cause)
+        ? cause.statusCode
+        : cause instanceof Error
+          ? cause.message
+          : "unknown error",
+    )
     return { ok: false, error: translateAiError(err), code: "provider_error" }
   }
 }

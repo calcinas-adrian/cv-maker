@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Download } from "lucide-react"
+import { useEffect, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { Download, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { AutosaveIndicator } from "./autosave-indicator"
+import { CvEditorSkeleton } from "./cv-editor-skeleton"
 import { useEditorStore } from "./editor-store"
 import { BasicInfoCard } from "./sections/basic-info-card"
 import { EducationSection } from "./sections/education-section"
@@ -50,7 +52,10 @@ export function CvEditor({
   const hydrate = useEditorStore((s) => s.hydrate)
   const setTheme = useEditorStore((s) => s.setTheme)
   const draft = useEditorStore((s) => s.draft)
+  const activeCvId = useEditorStore((s) => s.activeCvId)
   const [activeView, setActiveView] = useState<ContentView>("form")
+  const router = useRouter()
+  const [isRefreshing, startRefresh] = useTransition()
 
   useEffect(() => {
     // Hydrate once on mount from the server-provided initial data only.
@@ -70,7 +75,7 @@ export function CvEditor({
     // restore stays undoable.
     const temporal = useEditorStore.temporal.getState()
     temporal.pause()
-    hydrate(initialData)
+    hydrate(initialData, cvId)
     temporal.resume()
     temporal.clear()
     // `theme` is already outside `partialize` (never undo-tracked), so this
@@ -88,6 +93,19 @@ export function CvEditor({
         <h1 className="text-lg font-medium">Editar CV</h1>
         <div className="flex items-center gap-3">
           <AutosaveIndicator status={status} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isRefreshing}
+            onClick={() => startRefresh(() => router.refresh())}
+          >
+            <RefreshCwIcon
+              data-icon="inline-start"
+              className={isRefreshing ? "animate-spin" : undefined}
+            />
+            Recargar
+          </Button>
           <Button asChild variant="outline" size="sm">
             <a href={`/api/render/${cvId}`} download>
               <Download data-icon="inline-start" />
@@ -128,8 +146,21 @@ export function CvEditor({
         </div>
       </div>
 
-      {activeView === "form" ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+      {activeCvId !== cvId ? (
+        // `draft`/`activeCvId` still belong to a previously mounted CV for
+        // one or more frames after a switch (this store is a module-level
+        // singleton, never reset between CVs — see `editor-store.ts`).
+        // Render the same skeleton `loading.tsx` uses instead of letting
+        // `BasicInfoCard` etc. (which read `s.draft` with no cvId-awareness)
+        // or `YamlPanel` briefly render the wrong CV's content.
+        <CvEditorSkeleton />
+      ) : activeView === "form" ? (
+        // `shrink-0` on every card: `Card` sets `overflow-hidden`, and per
+        // the flexbox spec a flex item with non-visible overflow gets an
+        // automatic min-height of 0 — without this, the browser compresses
+        // each card toward zero height (showing only its header) instead of
+        // letting this container's `overflow-y-auto` scroll past them.
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 *:shrink-0">
           <BasicInfoCard />
           <ExperienceSection />
           <ProjectSection cvId={cvId} />
@@ -138,13 +169,8 @@ export function CvEditor({
           <VersionHistory cvId={cvId} />
         </div>
       ) : (
-        // `draft` is only null before the mount effect's `hydrate` runs — a
-        // one-tick window the user cannot reach this toggle during (it's
-        // rendered by the same component, after that effect has had a
-        // chance to fire on the very first commit). Guarded anyway so
-        // `YamlPanel` never receives a null draft.
         <div className="min-h-0 flex-1 p-4">
-          {draft ? <YamlPanel draft={draft} /> : null}
+          <YamlPanel draft={draft!} />
         </div>
       )}
     </div>

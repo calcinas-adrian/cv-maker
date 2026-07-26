@@ -17,7 +17,14 @@ type Direction = "up" | "down"
 
 type EditorState = {
   draft: CvData | null
-  hydrate: (cv: CvData) => void
+  // The CV the current `draft` belongs to — `null` before the first
+  // `hydrate`. `draft` truthiness alone isn't enough to know the draft is
+  // safe to render for a given cvId: this singleton store is never reset
+  // between CVs (see `hydrate`'s callers), so `draft` stays non-null and
+  // stale for a frame or two right after a CV switch. Consumers that need
+  // to render CV-specific data must check `activeCvId === cvId` too.
+  activeCvId: string | null
+  hydrate: (cv: CvData, cvId: string) => void
   updateSection: (patch: Partial<CvData>) => void
   // Coarse-grained write for the YAML commit path (5.4): one replacement of
   // the whole draft, as opposed to the granular per-field/per-item actions
@@ -92,8 +99,9 @@ export const useEditorStore = create<EditorState>()(
   temporal(
     (set) => ({
       draft: null,
+      activeCvId: null,
 
-      hydrate: (cv) => set({ draft: cv }),
+      hydrate: (cv, cvId) => set({ draft: cv, activeCvId: cvId }),
       replaceDraft: (data) => set({ draft: data }),
 
       theme: DEFAULT_THEME,

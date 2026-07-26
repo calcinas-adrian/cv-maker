@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -44,6 +45,8 @@ export function ProviderSettings({
     setDeletingId(null)
     if (result.ok) {
       void refresh()
+    } else {
+      toast.error(result.error)
     }
   }
 

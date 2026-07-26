@@ -10,13 +10,26 @@
 // engine only code-splits into the bundle once the preview pane mounts —
 // form/YAML editing stays fully interactive while it loads.
 import dynamic from "next/dynamic"
+import { FileCogIcon } from "lucide-react"
 import type { TypstPreviewProps } from "./typst-preview"
 
 const TypstPreview = dynamic(() => import("./typst-preview"), {
   ssr: false,
+  // Deliberately NOT a `DocumentSkeleton` — `next/dynamic`'s `loading`
+  // callback only receives `{ isLoading, pastDelay, error }`, never the
+  // wrapped component's `data`/`theme` props, so this state genuinely
+  // cannot be content-aware. It's also a different kind of wait (downloading
+  // the ~12MB WASM engine, not "your content is compiling"), so it gets its
+  // own "spinning up a tool" identity instead of an emptier document mockup.
   loading: () => (
-    <div className="text-muted-foreground flex h-full items-center justify-center p-8 text-sm">
-      Cargando motor de vista previa…
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8">
+      <FileCogIcon
+        aria-hidden
+        className="text-muted-foreground size-8 animate-pulse"
+      />
+      <div className="text-muted-foreground text-xs">
+        Cargando motor de vista previa…
+      </div>
     </div>
   ),
 })

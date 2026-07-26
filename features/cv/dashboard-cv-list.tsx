@@ -1,7 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { PencilIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import type { CvListItem } from "@/features/cv/list"
@@ -14,6 +17,10 @@ import { useInlineCvRename } from "@/features/cv/use-inline-cv-rename"
  * clicking anywhere else on the card still navigates to `/cv/[id]/edit`.
  */
 export function DashboardCvList({ cvs }: { cvs: CvListItem[] }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [pendingId, setPendingId] = useState<string | null>(null)
+
   const {
     titleFor,
     editingId,
@@ -56,10 +63,27 @@ export function DashboardCvList({ cvs }: { cvs: CvListItem[] }) {
               if (e.detail > 1) {
                 e.preventDefault()
                 startEditing(item)
+                return
               }
+              // Intercept the plain single-click so we can show pending
+              // feedback on this card while the navigation resolves —
+              // `Link` stays in place (unchanged) for prefetch,
+              // right-click/open-in-new-tab, and accessibility.
+              e.preventDefault()
+              setPendingId(item.id)
+              startTransition(() => {
+                router.push(`/cv/${item.id}/edit`)
+              })
             }}
           >
-            <Card className="hover:bg-muted/50 group transition-colors">
+            <Card
+              className={cn(
+                "hover:bg-muted/50 group transition-colors",
+                isPending &&
+                  pendingId === item.id &&
+                  "pointer-events-none opacity-50",
+              )}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-1">
                   <span className="min-w-0 truncate">{titleFor(item)}</span>

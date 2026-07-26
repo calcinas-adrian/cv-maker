@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 
@@ -47,12 +48,17 @@ export function ConnectGithubButton({
 
   async function handleConnect() {
     setIsLoading(true)
-    await authClient.linkSocial({
-      provider: "github",
-      scopes: [IMPORT_SCOPE],
-      callbackURL,
-    })
-    setIsLoading(false)
+    try {
+      await authClient.linkSocial({
+        provider: "github",
+        scopes: [IMPORT_SCOPE],
+        callbackURL,
+      })
+    } catch {
+      toast.error("No se pudo conectar con GitHub")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

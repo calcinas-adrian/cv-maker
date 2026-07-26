@@ -1,6 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { useParams } from "next/navigation"
 import {
   Group as ResizablePanelGroup,
   Panel as ResizablePanel,
@@ -8,6 +9,7 @@ import {
 } from "react-resizable-panels"
 import { usePersistedPanelLayout } from "@/hooks/use-persisted-panel-layout"
 import { TypstPreviewLazy } from "@/features/render/typst-preview-lazy"
+import { DocumentSkeleton } from "@/features/render/cv-preview-skeleton"
 import { useEditorStore } from "@/features/cv/editor-store"
 import type { CvListItem } from "@/features/cv/list"
 import { CvListSidebar } from "./cv-list-sidebar"
@@ -66,9 +68,12 @@ const RESIZABLE_HANDLE_CLASSNAME =
  * `features/render/typst-preview.tsx`), THIS component — which owns/
  * renders the Group — subscribes to `useEditorStore` directly to supply
  * `data`/`theme`. `draft` is `CvData | null` (null before `CvEditor`'s
- * first `hydrate`, and briefly during a CV switch), so the preview only
- * mounts once `draft` is non-null; a skeleton is shown otherwise. Never
- * fabricate an empty `CvData` here — that would mask real
+ * first `hydrate`) but stays non-null and STALE (the previous CV's data)
+ * for a frame or two during a CV switch — this store is a module-level
+ * singleton, never reset between CVs. So the preview only mounts once
+ * `draft` is non-null AND `activeCvId` (also set by `hydrate`) matches the
+ * CV currently in the URL; the "Cargando…" fallback is shown otherwise.
+ * Never fabricate an empty `CvData` here — that would mask real
  * hydration-timing bugs.
  *
  * Bonus: the preview + ~12MB WASM engine now live in this persistent
@@ -86,6 +91,8 @@ export function CvWorkspaceShell({
     usePersistedPanelLayout("cv-workspace")
   const draft = useEditorStore((s) => s.draft)
   const theme = useEditorStore((s) => s.theme)
+  const activeCvId = useEditorStore((s) => s.activeCvId)
+  const params = useParams<{ id?: string }>()
 
   return (
     <ResizablePanelGroup
@@ -109,11 +116,20 @@ export function CvWorkspaceShell({
       </ResizablePanel>
       <ResizableHandle className={RESIZABLE_HANDLE_CLASSNAME} />
       <ResizablePanel id="preview" defaultSize="35%" minSize="320px">
-        {draft ? (
+        {draft && activeCvId === params.id ? (
           <TypstPreviewLazy data={draft} theme={theme} className="h-full" />
         ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center p-8 text-sm">
-            Cargando…
+          <div className="relative h-full overflow-hidden">
+            <DocumentSkeleton
+              experienceCount={2}
+              projectCount={1}
+              educationCount={1}
+              skillCount={1}
+              className="h-full"
+            />
+            <div className="text-muted-foreground absolute inset-x-0 bottom-4 text-center text-xs">
+              Cargando…
+            </div>
           </div>
         )}
       </ResizablePanel>

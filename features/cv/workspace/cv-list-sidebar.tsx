@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { PencilIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
@@ -18,6 +19,9 @@ import { useInlineCvRename } from "@/features/cv/use-inline-cv-rename"
 export function CvListSidebar({ cvs }: { cvs: CvListItem[] }) {
   const params = useParams<{ id?: string }>()
   const activeId = params.id
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [pendingId, setPendingId] = useState<string | null>(null)
 
   const {
     titleFor,
@@ -78,11 +82,33 @@ export function CvListSidebar({ cvs }: { cvs: CvListItem[] }) {
                 if (e.detail > 1) {
                   e.preventDefault()
                   startEditing(item)
+                  return
                 }
+                // Clicking the CV that's already open must be a true
+                // no-op — no preventDefault, no pending state, no
+                // transition/navigation. The user explicitly does not
+                // want an implicit reload of the CV being edited (see
+                // the "Recargar" button in `CvEditor` for the deliberate
+                // alternative).
+                if (item.id === activeId) {
+                  return
+                }
+                // Intercept the plain single-click so we can show pending
+                // feedback on this row while the navigation resolves —
+                // `Link` stays in place (unchanged) for prefetch,
+                // right-click/open-in-new-tab, and accessibility.
+                e.preventDefault()
+                setPendingId(item.id)
+                startTransition(() => {
+                  router.push(`/cv/${item.id}/edit`)
+                })
               }}
               className={cn(
                 "hover:bg-muted group flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors",
                 activeId === item.id && "bg-muted font-medium",
+                isPending &&
+                  pendingId === item.id &&
+                  "pointer-events-none opacity-50",
               )}
             >
               <span className="min-w-0 truncate">{titleFor(item)}</span>

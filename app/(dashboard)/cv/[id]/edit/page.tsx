@@ -28,38 +28,77 @@ export default async function EditCvPage({
   }
 
   // cvId comes from the URL — never trust it alone, scope by userId too.
-  const [cvRow] = await db
-    .select()
-    .from(cv)
-    .where(and(eq(cv.id, id), eq(cv.userId, session.user.id)))
-    .limit(1)
+  // Each of the 5 queries below independently proves ownership (either via
+  // `cv.userId` directly, or via an `innerJoin` back to `cv` for the child
+  // tables), so none of them depends on call-order for its security — a
+  // future reordering of this array can't accidentally leak an
+  // unauthorized read.
+  const [cvRows, experiences, projects, educations, skills] = await Promise.all(
+    [
+      db
+        .select()
+        .from(cv)
+        .where(and(eq(cv.id, id), eq(cv.userId, session.user.id)))
+        .limit(1),
+      db
+        .select({
+          id: experience.id,
+          sortOrder: experience.sortOrder,
+          company: experience.company,
+          role: experience.role,
+          startDate: experience.startDate,
+          endDate: experience.endDate,
+          bullets: experience.bullets,
+        })
+        .from(experience)
+        .innerJoin(cv, eq(cv.id, experience.cvId))
+        .where(and(eq(experience.cvId, id), eq(cv.userId, session.user.id)))
+        .orderBy(asc(experience.sortOrder)),
+      db
+        .select({
+          id: project.id,
+          sortOrder: project.sortOrder,
+          name: project.name,
+          description: project.description,
+          url: project.url,
+          bullets: project.bullets,
+        })
+        .from(project)
+        .innerJoin(cv, eq(cv.id, project.cvId))
+        .where(and(eq(project.cvId, id), eq(cv.userId, session.user.id)))
+        .orderBy(asc(project.sortOrder)),
+      db
+        .select({
+          id: education.id,
+          sortOrder: education.sortOrder,
+          institution: education.institution,
+          degree: education.degree,
+          startDate: education.startDate,
+          endDate: education.endDate,
+        })
+        .from(education)
+        .innerJoin(cv, eq(cv.id, education.cvId))
+        .where(and(eq(education.cvId, id), eq(cv.userId, session.user.id)))
+        .orderBy(asc(education.sortOrder)),
+      db
+        .select({
+          id: skill.id,
+          sortOrder: skill.sortOrder,
+          name: skill.name,
+          category: skill.category,
+        })
+        .from(skill)
+        .innerJoin(cv, eq(cv.id, skill.cvId))
+        .where(and(eq(skill.cvId, id), eq(cv.userId, session.user.id)))
+        .orderBy(asc(skill.sortOrder)),
+    ],
+  )
+
+  const [cvRow] = cvRows
 
   if (!cvRow) {
     notFound()
   }
-
-  const [experiences, projects, educations, skills] = await Promise.all([
-    db
-      .select()
-      .from(experience)
-      .where(eq(experience.cvId, id))
-      .orderBy(asc(experience.sortOrder)),
-    db
-      .select()
-      .from(project)
-      .where(eq(project.cvId, id))
-      .orderBy(asc(project.sortOrder)),
-    db
-      .select()
-      .from(education)
-      .where(eq(education.cvId, id))
-      .orderBy(asc(education.sortOrder)),
-    db
-      .select()
-      .from(skill)
-      .where(eq(skill.cvId, id))
-      .orderBy(asc(skill.sortOrder)),
-  ])
 
   const initialData: CvData = {
     fullName: cvRow.fullName ?? undefined,
@@ -97,15 +136,22 @@ export default async function EditCvPage({
   }
 
   return (
-    // `key={id}` forces a clean unmount+remount of `CvEditor` on every CV
-    // switch — required because `editor-store` is a module-level singleton
-    // and the persistent `/cv/*` sidebar layout does not remount on
-    // sibling-route navigation, so without this key the previous CV's
+    // Keying on `id` alone forces a clean unmount+remount of `CvEditor` on
+    // every CV switch — required because `editor-store` is a module-level
+    // singleton and the persistent `/cv/*` sidebar layout does not remount
+    // on sibling-route navigation, so without this key the previous CV's
     // hydrated draft, autosave concurrency ref, and undo history would
-    // otherwise leak into the newly opened CV. See
-    // `sdd/cv-editor-panel/design` Decision 1 addendum.
+    // otherwise leak into the newly opened CV (see
+    // `sdd/cv-editor-panel/design` Decision 1 addendum). Also folding in
+    // `updatedAt` reuses that same remount mechanism for the "Recargar"
+    // button: `CvEditor`'s hydrate effect is mount-only (by design, so
+    // ordinary re-renders never clobber in-progress edits), so a bare
+    // `router.refresh()` would fetch fresh props server-side but never flow
+    // into the client store unless the key actually changes. A refresh
+    // that finds no real change to the row keeps the same key (no-op); one
+    // that finds the row genuinely changed gets a new key and remounts.
     <CvEditor
-      key={id}
+      key={`${id}:${cvRow.updatedAt.toISOString()}`}
       cvId={id}
       initialData={initialData}
       initialUpdatedAt={cvRow.updatedAt.toISOString()}

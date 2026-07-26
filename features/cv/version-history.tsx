@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,6 +32,8 @@ export function VersionHistory({ cvId }: { cvId: string }) {
   const [loading, setLoading] = useState(true)
   const [labelDialogOpen, setLabelDialogOpen] = useState(false)
   const [label, setLabel] = useState("")
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const hydrate = useEditorStore((s) => s.hydrate)
 
   async function refresh() {
@@ -58,20 +61,30 @@ export function VersionHistory({ cvId }: { cvId: string }) {
   }, [cvId])
 
   async function handleRestore(versionId: string) {
+    setRestoringId(versionId)
     const result = await restoreVersion(cvId, versionId)
+    setRestoringId(null)
     if (result.ok) {
       // Restoring only re-hydrates the client draft — it never writes to
       // the cv table directly. The user's next edit/autosave persists it.
-      hydrate(result.data)
+      // Same CV as before (a version restore never changes which CV is
+      // open), so `cvId` here is just the already-active one.
+      hydrate(result.data, cvId)
+    } else {
+      toast.error(result.error)
     }
   }
 
   async function handleNameVersion() {
+    setIsSaving(true)
     const result = await saveVersion(cvId, label || null)
+    setIsSaving(false)
     if (result.ok) {
       setLabel("")
       setLabelDialogOpen(false)
       void refresh()
+    } else {
+      toast.error(result.error)
     }
   }
 
@@ -96,7 +109,11 @@ export function VersionHistory({ cvId }: { cvId: string }) {
                 placeholder="ej. Antes de postularme a Acme"
               />
               <DialogFooter>
-                <Button type="button" onClick={handleNameVersion}>
+                <Button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={handleNameVersion}
+                >
                   Guardar
                 </Button>
               </DialogFooter>
@@ -129,6 +146,7 @@ export function VersionHistory({ cvId }: { cvId: string }) {
                 type="button"
                 size="sm"
                 variant="outline"
+                disabled={restoringId === version.id}
                 onClick={() => handleRestore(version.id)}
               >
                 Restaurar

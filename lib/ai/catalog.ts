@@ -88,18 +88,32 @@ export const MODEL_CATALOG: Record<
     },
   ],
   deepseek: [
+    // `deepseek-chat`/`deepseek-reasoner` (V3/R1) were removed here after
+    // DeepSeek's API started rejecting them with a 400 ("The supported API
+    // model names are deepseek-v4-pro or deepseek-v4-flash") — confirmed
+    // live against the real API, not from docs.
+    //
+    // Both entries are `recommendedForExtraction: false`, unlike every
+    // other provider here — verified against the installed
+    // `@ai-sdk/deepseek@3.0.5` package's own source
+    // (`convertToDeepSeekChatMessages` in its `dist/internal/index.js`):
+    // it computes `isDeepSeekV4 = modelId.includes("deepseek-v4")` but
+    // never branches on it for `response_format` — every DeepSeek model
+    // in this package version always gets the schema stuffed into a
+    // system-message prompt instead of a real `json_schema`/tool-call
+    // response format, regardless of pro vs. flash. This is a package
+    // limitation, not a model-choice problem — picking "pro" over
+    // "flash" will NOT fix `generateObject` reliability here. Revisit if
+    // `@ai-sdk/deepseek` ships a version that actually wires up
+    // `isDeepSeekV4` to a native structured-output path.
     {
-      id: "deepseek-chat",
-      label: "DeepSeek Chat (V3)",
-      recommendedForExtraction: true,
+      id: "deepseek-v4-pro",
+      label: "DeepSeek V4 Pro",
+      recommendedForExtraction: false,
     },
     {
-      // Reasoning models spend part of the output budget on hidden
-      // thinking tokens, which makes them slower/pricier and less
-      // predictable for strict structured-output extraction than the
-      // plain chat model above.
-      id: "deepseek-reasoner",
-      label: "DeepSeek Reasoner (R1)",
+      id: "deepseek-v4-flash",
+      label: "DeepSeek V4 Flash",
       recommendedForExtraction: false,
     },
   ],

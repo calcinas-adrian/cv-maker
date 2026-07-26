@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   Card,
   CardContent,
@@ -27,19 +28,29 @@ export default function LoginPage() {
 
   async function handleGithubSignIn() {
     setIsGithubLoading(true)
-    await authClient.signIn.social({
-      provider: "github",
-      callbackURL: "/dashboard",
-    })
-    setIsGithubLoading(false)
+    try {
+      await authClient.signIn.social({
+        provider: "github",
+        callbackURL: "/dashboard",
+      })
+    } catch {
+      toast.error("No se pudo iniciar sesión con GitHub")
+    } finally {
+      setIsGithubLoading(false)
+    }
   }
 
   async function handlePasskeySignIn() {
     setIsPasskeyLoading(true)
-    const { data } = await authClient.signIn.passkey()
-    setIsPasskeyLoading(false)
-    if (data) {
-      router.push("/dashboard")
+    try {
+      const { data } = await authClient.signIn.passkey()
+      if (data) {
+        router.push("/dashboard")
+      }
+    } catch {
+      toast.error("No se pudo iniciar sesión con la passkey")
+    } finally {
+      setIsPasskeyLoading(false)
     }
   }
 

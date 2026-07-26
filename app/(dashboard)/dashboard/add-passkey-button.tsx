@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 
@@ -9,8 +10,13 @@ export function AddPasskeyButton() {
 
   async function handleAddPasskey() {
     setIsLoading(true)
-    await authClient.passkey.addPasskey()
-    setIsLoading(false)
+    try {
+      await authClient.passkey.addPasskey()
+    } catch {
+      toast.error("No se pudo agregar la passkey")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
