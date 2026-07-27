@@ -46,6 +46,23 @@ export const skillItemSchema = z.object({
   category: z.string().nullable().optional(),
 })
 
+export const achievementItemSchema = z.object({
+  id: z.string(),
+  title: z.string().optional(),
+  issuer: z.string().nullable().optional(),
+  date: dateStringSchema,
+  description: z.string().nullable().optional(),
+})
+
+export const referenceItemSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  role: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+})
+
 export const cvDataSchema = z.object({
   fullName: z.string().optional(),
   email: z.string().optional(),
@@ -56,6 +73,15 @@ export const cvDataSchema = z.object({
   projects: z.array(projectItemSchema).optional().default([]),
   education: z.array(educationItemSchema).optional().default([]),
   skills: z.array(skillItemSchema).optional().default([]),
+  // `.default([])` is what makes these safe to add to an ALREADY-DEPLOYED
+  // schema: `cv_version.snapshot` is a jsonb column typed as `CvData`, so
+  // every snapshot written before these fields existed lacks both keys.
+  // Any read path that PARSES the snapshot gets `[]` back; a raw cast does
+  // not (see `restoreVersion` in `features/cv/actions.ts`, which returns
+  // `versionRow.snapshot` unparsed — the store tolerates a missing key
+  // because every section selector falls back to its `EMPTY_*` constant).
+  achievements: z.array(achievementItemSchema).optional().default([]),
+  references: z.array(referenceItemSchema).optional().default([]),
 })
 
 // Alias used at the server-action boundary — same schema, name matches the
@@ -66,6 +92,8 @@ export type ExperienceItem = z.infer<typeof experienceItemSchema>
 export type ProjectItem = z.infer<typeof projectItemSchema>
 export type EducationItem = z.infer<typeof educationItemSchema>
 export type SkillItem = z.infer<typeof skillItemSchema>
+export type AchievementItem = z.infer<typeof achievementItemSchema>
+export type ReferenceItem = z.infer<typeof referenceItemSchema>
 export type CvData = z.infer<typeof cvDataSchema>
 
 /**

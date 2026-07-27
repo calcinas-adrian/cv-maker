@@ -41,6 +41,19 @@ export type TypstCvPayload = {
     name: string
     category: string
   }[]
+  achievements: {
+    title: string
+    issuer: string
+    date: string
+    description: string
+  }[]
+  references: {
+    name: string
+    role: string
+    company: string
+    email: string
+    phone: string
+  }[]
 }
 
 /**
@@ -87,6 +100,19 @@ export function toTypstPayload(cv: CvData): TypstCvPayload {
     skills: (cv.skills ?? []).map((s) => ({
       name: s.name ?? "",
       category: s.category ?? "",
+    })),
+    achievements: (cv.achievements ?? []).map((a) => ({
+      title: a.title ?? "",
+      issuer: a.issuer ?? "",
+      date: a.date ?? "",
+      description: a.description ?? "",
+    })),
+    references: (cv.references ?? []).map((r) => ({
+      name: r.name ?? "",
+      role: r.role ?? "",
+      company: r.company ?? "",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
     })),
   }
 }

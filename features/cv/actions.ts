@@ -4,11 +4,13 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm"
 import { createId } from "@paralleldrive/cuid2"
 import { db } from "@/db"
 import {
+  achievement,
   cv,
   cvVersion,
   education,
   experience,
   project,
+  reference,
   skill,
 } from "@/db/schema"
 import { cvDraftSchema, type CvData } from "@/schemas/cv.schema"
@@ -78,28 +80,39 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
   const owned = await findOwnedCv(cvId, userId)
   if (!owned) return { ok: false, error: "No encontrado", code: "not_found" }
 
-  const [experiences, projects, educations, skills] = await Promise.all([
-    db
-      .select()
-      .from(experience)
-      .where(eq(experience.cvId, cvId))
-      .orderBy(asc(experience.sortOrder)),
-    db
-      .select()
-      .from(project)
-      .where(eq(project.cvId, cvId))
-      .orderBy(asc(project.sortOrder)),
-    db
-      .select()
-      .from(education)
-      .where(eq(education.cvId, cvId))
-      .orderBy(asc(education.sortOrder)),
-    db
-      .select()
-      .from(skill)
-      .where(eq(skill.cvId, cvId))
-      .orderBy(asc(skill.sortOrder)),
-  ])
+  const [experiences, projects, educations, skills, achievements, references] =
+    await Promise.all([
+      db
+        .select()
+        .from(experience)
+        .where(eq(experience.cvId, cvId))
+        .orderBy(asc(experience.sortOrder)),
+      db
+        .select()
+        .from(project)
+        .where(eq(project.cvId, cvId))
+        .orderBy(asc(project.sortOrder)),
+      db
+        .select()
+        .from(education)
+        .where(eq(education.cvId, cvId))
+        .orderBy(asc(education.sortOrder)),
+      db
+        .select()
+        .from(skill)
+        .where(eq(skill.cvId, cvId))
+        .orderBy(asc(skill.sortOrder)),
+      db
+        .select()
+        .from(achievement)
+        .where(eq(achievement.cvId, cvId))
+        .orderBy(asc(achievement.sortOrder)),
+      db
+        .select()
+        .from(reference)
+        .where(eq(reference.cvId, cvId))
+        .orderBy(asc(reference.sortOrder)),
+    ])
 
   return {
     ok: true,
@@ -135,6 +148,21 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
         id: s.id,
         name: s.name,
         category: s.category,
+      })),
+      achievements: achievements.map((a) => ({
+        id: a.id,
+        title: a.title,
+        issuer: a.issuer,
+        date: a.date,
+        description: a.description,
+      })),
+      references: references.map((r) => ({
+        id: r.id,
+        name: r.name,
+        role: r.role,
+        company: r.company,
+        email: r.email,
+        phone: r.phone,
       })),
     },
   }

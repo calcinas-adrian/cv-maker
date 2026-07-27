@@ -46,6 +46,11 @@ export function CvWorkspaceShellSkeleton() {
           projectCount={1}
           educationCount={1}
           skillCount={1}
+          // 0 on purpose: this is the generic pre-hydration mockup, and most
+          // CVs have neither section — inventing blocks for them would make
+          // the placeholder taller than the document it stands in for.
+          achievementCount={0}
+          referenceCount={0}
           className="h-full"
         />
       </div>

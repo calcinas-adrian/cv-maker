@@ -29,35 +29,38 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import type { EducationItem } from "@/schemas/cv.schema"
-import { EMPTY_EDUCATION, useEditorStore } from "../editor-store"
+import { Textarea } from "@/components/ui/textarea"
+import type { AchievementItem } from "@/schemas/cv.schema"
+import { EMPTY_ACHIEVEMENTS, useEditorStore } from "../editor-store"
 import { ItemRow } from "./item-row"
 
 const formSchema = z.object({
-  institution: z.string().min(1, "Obligatorio"),
-  degree: z.string().min(1, "Obligatorio"),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  title: z.string().min(1, "Obligatorio"),
+  issuer: z.string().optional(),
+  date: z.string().optional(),
+  description: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-function toFormValues(item: EducationItem | null): FormValues {
+function toFormValues(item: AchievementItem | null): FormValues {
   return {
-    institution: item?.institution ?? "",
-    degree: item?.degree ?? "",
-    startDate: item?.startDate ?? "",
-    endDate: item?.endDate ?? "",
+    title: item?.title ?? "",
+    issuer: item?.issuer ?? "",
+    date: item?.date ?? "",
+    description: item?.description ?? "",
   }
 }
 
-export function EducationSection() {
-  const education = useEditorStore((s) => s.draft?.education ?? EMPTY_EDUCATION)
-  const addEducation = useEditorStore((s) => s.addEducation)
-  const updateEducation = useEditorStore((s) => s.updateEducation)
-  const removeEducation = useEditorStore((s) => s.removeEducation)
-  const moveEducation = useEditorStore((s) => s.moveEducation)
-  const duplicateEducation = useEditorStore((s) => s.duplicateEducation)
+export function AchievementSection() {
+  const achievements = useEditorStore(
+    (s) => s.draft?.achievements ?? EMPTY_ACHIEVEMENTS,
+  )
+  const addAchievement = useEditorStore((s) => s.addAchievement)
+  const updateAchievement = useEditorStore((s) => s.updateAchievement)
+  const removeAchievement = useEditorStore((s) => s.removeAchievement)
+  const moveAchievement = useEditorStore((s) => s.moveAchievement)
+  const duplicateAchievement = useEditorStore((s) => s.duplicateAchievement)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -73,25 +76,25 @@ export function EducationSection() {
     setOpen(true)
   }
 
-  function openEditDialog(item: EducationItem) {
+  function openEditDialog(item: AchievementItem) {
     setEditingId(item.id)
     form.reset(toFormValues(item))
     setOpen(true)
   }
 
   function onSubmit(values: FormValues) {
-    const item: EducationItem = {
+    const item: AchievementItem = {
       id: editingId ?? crypto.randomUUID(),
-      institution: values.institution,
-      degree: values.degree,
-      startDate: values.startDate || null,
-      endDate: values.endDate || null,
+      title: values.title,
+      issuer: values.issuer || null,
+      date: values.date || null,
+      description: values.description || null,
     }
 
     if (editingId) {
-      updateEducation(editingId, item)
+      updateAchievement(editingId, item)
     } else {
-      addEducation(item)
+      addAchievement(item)
     }
     setOpen(false)
   }
@@ -99,7 +102,7 @@ export function EducationSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Educación</CardTitle>
+        <CardTitle>Logros</CardTitle>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar
@@ -107,27 +110,23 @@ export function EducationSection() {
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {education.length === 0 ? (
+        {achievements.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            Todavía no agregaste educación.
+            Todavía no agregaste logros.
           </p>
         ) : (
-          education.map((item, index) => (
+          achievements.map((item, index) => (
             <ItemRow
               key={item.id}
-              title={[item.degree, item.institution]
-                .filter(Boolean)
-                .join(" @ ")}
-              subtitle={[item.startDate, item.endDate]
-                .filter(Boolean)
-                .join(" — ")}
+              title={item.title ?? ""}
+              subtitle={[item.issuer, item.date].filter(Boolean).join(" — ")}
               onEdit={() => openEditDialog(item)}
-              onClone={() => duplicateEducation(item.id, crypto.randomUUID())}
-              onRemove={() => removeEducation(item.id)}
-              onMoveUp={() => moveEducation(item.id, "up")}
-              onMoveDown={() => moveEducation(item.id, "down")}
+              onClone={() => duplicateAchievement(item.id, crypto.randomUUID())}
+              onRemove={() => removeAchievement(item.id)}
+              onMoveUp={() => moveAchievement(item.id, "up")}
+              onMoveDown={() => moveAchievement(item.id, "down")}
               canMoveUp={index > 0}
-              canMoveDown={index < education.length - 1}
+              canMoveDown={index < achievements.length - 1}
             />
           ))
         )}
@@ -137,7 +136,7 @@ export function EducationSection() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingId ? "Editar educación" : "Agregar educación"}
+              {editingId ? "Editar logro" : "Agregar logro"}
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
@@ -147,25 +146,15 @@ export function EducationSection() {
             >
               <FormField
                 control={form.control}
-                name="institution"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Institución</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="degree"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Título</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input
+                        placeholder="Primer puesto en el hackathon interno"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -174,12 +163,12 @@ export function EducationSection() {
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
-                  name="startDate"
+                  name="issuer"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Inicio</FormLabel>
+                      <FormLabel>Otorgado por</FormLabel>
                       <FormControl>
-                        <Input placeholder="2018" {...field} />
+                        <Input placeholder="Empresa, institución…" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -187,18 +176,31 @@ export function EducationSection() {
                 />
                 <FormField
                   control={form.control}
-                  name="endDate"
+                  name="date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fin</FormLabel>
+                      <FormLabel>Fecha</FormLabel>
                       <FormControl>
-                        <Input placeholder="2022" {...field} />
+                        <Input placeholder="Mar 2023" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descripción</FormLabel>
+                    <FormControl>
+                      <Textarea rows={3} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button type="submit">Guardar</Button>
               </DialogFooter>

@@ -34,6 +34,7 @@ export function ExperienceSection() {
   const updateExperience = useEditorStore((s) => s.updateExperience)
   const removeExperience = useEditorStore((s) => s.removeExperience)
   const moveExperience = useEditorStore((s) => s.moveExperience)
+  const duplicateExperience = useEditorStore((s) => s.duplicateExperience)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -96,6 +97,7 @@ export function ExperienceSection() {
                 .filter(Boolean)
                 .join(" — ")}
               onEdit={() => openEditDialog(item)}
+              onClone={() => duplicateExperience(item.id, crypto.randomUUID())}
               onRemove={() => removeExperience(item.id)}
               onMoveUp={() => moveExperience(item.id, "up")}
               onMoveDown={() => moveExperience(item.id, "down")}

@@ -58,9 +58,17 @@ a mano después.`
  * favor of `instructions` (both accept the same
  * `string | SystemModelMessage | Array<SystemModelMessage>` shape) — this
  * uses the current, non-deprecated field. `maxRetries` (via
- * `RequestOptions`, not an `experimental_*` option) and `maxOutputTokens`
- * (not `maxTokens`) are confirmed correct, matching Phase 4's
- * `generateText` findings.
+ * `RequestOptions`, not an `experimental_*` option) is confirmed correct,
+ * matching Phase 4's `generateText` findings.
+ *
+ * NO `maxOutputTokens` — this used to be 1024, bumped to 1536 when a code
+ * digest was present. Removed for the same reason as
+ * `features/cv-adapt/ai-extract.ts` (see that file's header for the full
+ * rationale): a fixed budget is a guess, and guessing low truncates the
+ * JSON and bills the tokens for a discarded result. This call site had the
+ * tightest budget of the three, so it was the most exposed. The provider's
+ * own default now applies; `lib/ai/errors.ts` logs `finishReason` and
+ * `usage` on failure so the real ceiling becomes visible when reached.
  */
 export async function extractFromRepoData(
   model: LanguageModel,
@@ -97,19 +105,12 @@ Respondé en ${languageInstruction}.`
     ? `<repo_data>\n${JSON.stringify(repoData)}\n</repo_data>\n<code_digest>\n${options.codeDigest}\n</code_digest>`
     : `<repo_data>\n${JSON.stringify(repoData)}\n</repo_data>`
 
-  // A code digest gives the model materially more to work with (multiple
-  // real files vs. metadata + one README), so richer/longer bullets are a
-  // reasonable result — bump the output ceiling accordingly. Still a fixed,
-  // bounded budget, not unbounded.
-  const maxOutputTokens = options.codeDigest ? 1536 : 1024
-
   if (options.target === "project") {
     const { object } = await generateObject({
       model,
       schema: projectExtractSchema,
       instructions,
       prompt,
-      maxOutputTokens,
       maxRetries: 2,
     })
     return object
@@ -120,7 +121,6 @@ Respondé en ${languageInstruction}.`
     schema: experienceExtractSchema,
     instructions,
     prompt,
-    maxOutputTokens,
     maxRetries: 2,
   })
   return object

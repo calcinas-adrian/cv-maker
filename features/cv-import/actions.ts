@@ -1,7 +1,7 @@
 "use server"
 
 import { headers } from "next/headers"
-import { APICallError, NoObjectGeneratedError, RetryError } from "ai"
+import { APICallError } from "ai"
 import { createId } from "@paralleldrive/cuid2"
 import type { BatchItem } from "drizzle-orm/batch"
 import { auth } from "@/lib/auth"
@@ -9,6 +9,7 @@ import { db } from "@/db"
 import { cv } from "@/db/schema"
 import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
+import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
 import type { Result } from "@/lib/result"
 import { buildCvSectionQueries } from "@/features/cv/persist-sections"
 import { cvDraftSchema, type CvData } from "@/schemas/cv.schema"
@@ -26,40 +27,6 @@ import {
 async function getSessionUserId(): Promise<string | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   return session?.user.id ?? null
-}
-
-/**
- * Same fix as `features/ai-providers/actions.ts`'s `unwrapRetryError` /
- * `features/github-import/actions.ts`'s copy of it: `generateObject`'s
- * `maxRetries` wraps the real provider failure in a `RetryError` once
- * retries are exhausted, so `APICallError.isInstance` must be checked
- * against the unwrapped `.lastError` — checking it against the raw caught
- * error would silently fall through to the generic message below for
- * every retried failure.
- */
-function unwrapRetryError(err: unknown): unknown {
-  return RetryError.isInstance(err) ? err.lastError : err
-}
-
-function translateAiError(err: unknown): string {
-  const cause = unwrapRetryError(err)
-  if (APICallError.isInstance(cause)) {
-    if (cause.statusCode === 401 || cause.statusCode === 403) {
-      return "El proveedor de IA rechazó la clave configurada: revisala en Ajustes."
-    }
-    if (cause.statusCode === 429) {
-      return "El proveedor de IA devolvió un límite de uso (429). Probá de nuevo en un momento."
-    }
-    return `El proveedor de IA devolvió un error${cause.statusCode ? ` (${cause.statusCode})` : ""}.`
-  }
-  if (NoObjectGeneratedError.isInstance(cause)) {
-    return "El modelo no devolvió un resultado válido. Probá de nuevo."
-  }
-  console.error(
-    "AI CV extraction failed",
-    cause instanceof Error ? cause.message : "unknown error",
-  )
-  return "No se pudo extraer el CV con IA. Probá de nuevo."
 }
 
 function hasAcceptedExtension(filename: string): boolean {
@@ -143,7 +110,14 @@ export async function extractCvFromFile(
           ? cause.message
           : "unknown error",
     )
-    return { ok: false, error: translateAiError(err), code: "provider_error" }
+    return {
+      ok: false,
+      error: translateAiError(err, {
+        logLabel: "AI CV extraction failed",
+        fallback: "No se pudo extraer el CV con IA. Probá de nuevo.",
+      }),
+      code: "provider_error",
+    }
   }
 }
 

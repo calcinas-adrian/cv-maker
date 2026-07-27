@@ -3,7 +3,15 @@ import { notFound, redirect } from "next/navigation"
 import { and, asc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
-import { cv, education, experience, project, skill } from "@/db/schema"
+import {
+  achievement,
+  cv,
+  education,
+  experience,
+  project,
+  reference,
+  skill,
+} from "@/db/schema"
 import { DEFAULT_THEME, type CvData } from "@/schemas/cv.schema"
 import { CvEditor } from "@/features/cv/cv-editor"
 
@@ -28,71 +36,104 @@ export default async function EditCvPage({
   }
 
   // cvId comes from the URL — never trust it alone, scope by userId too.
-  // Each of the 5 queries below independently proves ownership (either via
+  // Each of the 7 queries below independently proves ownership (either via
   // `cv.userId` directly, or via an `innerJoin` back to `cv` for the child
   // tables), so none of them depends on call-order for its security — a
   // future reordering of this array can't accidentally leak an
   // unauthorized read.
-  const [cvRows, experiences, projects, educations, skills] = await Promise.all(
-    [
-      db
-        .select()
-        .from(cv)
-        .where(and(eq(cv.id, id), eq(cv.userId, session.user.id)))
-        .limit(1),
-      db
-        .select({
-          id: experience.id,
-          sortOrder: experience.sortOrder,
-          company: experience.company,
-          role: experience.role,
-          startDate: experience.startDate,
-          endDate: experience.endDate,
-          bullets: experience.bullets,
-        })
-        .from(experience)
-        .innerJoin(cv, eq(cv.id, experience.cvId))
-        .where(and(eq(experience.cvId, id), eq(cv.userId, session.user.id)))
-        .orderBy(asc(experience.sortOrder)),
-      db
-        .select({
-          id: project.id,
-          sortOrder: project.sortOrder,
-          name: project.name,
-          description: project.description,
-          url: project.url,
-          bullets: project.bullets,
-        })
-        .from(project)
-        .innerJoin(cv, eq(cv.id, project.cvId))
-        .where(and(eq(project.cvId, id), eq(cv.userId, session.user.id)))
-        .orderBy(asc(project.sortOrder)),
-      db
-        .select({
-          id: education.id,
-          sortOrder: education.sortOrder,
-          institution: education.institution,
-          degree: education.degree,
-          startDate: education.startDate,
-          endDate: education.endDate,
-        })
-        .from(education)
-        .innerJoin(cv, eq(cv.id, education.cvId))
-        .where(and(eq(education.cvId, id), eq(cv.userId, session.user.id)))
-        .orderBy(asc(education.sortOrder)),
-      db
-        .select({
-          id: skill.id,
-          sortOrder: skill.sortOrder,
-          name: skill.name,
-          category: skill.category,
-        })
-        .from(skill)
-        .innerJoin(cv, eq(cv.id, skill.cvId))
-        .where(and(eq(skill.cvId, id), eq(cv.userId, session.user.id)))
-        .orderBy(asc(skill.sortOrder)),
-    ],
-  )
+  const [
+    cvRows,
+    experiences,
+    projects,
+    educations,
+    skills,
+    achievements,
+    references,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(cv)
+      .where(and(eq(cv.id, id), eq(cv.userId, session.user.id)))
+      .limit(1),
+    db
+      .select({
+        id: experience.id,
+        sortOrder: experience.sortOrder,
+        company: experience.company,
+        role: experience.role,
+        startDate: experience.startDate,
+        endDate: experience.endDate,
+        bullets: experience.bullets,
+      })
+      .from(experience)
+      .innerJoin(cv, eq(cv.id, experience.cvId))
+      .where(and(eq(experience.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(experience.sortOrder)),
+    db
+      .select({
+        id: project.id,
+        sortOrder: project.sortOrder,
+        name: project.name,
+        description: project.description,
+        url: project.url,
+        bullets: project.bullets,
+      })
+      .from(project)
+      .innerJoin(cv, eq(cv.id, project.cvId))
+      .where(and(eq(project.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(project.sortOrder)),
+    db
+      .select({
+        id: education.id,
+        sortOrder: education.sortOrder,
+        institution: education.institution,
+        degree: education.degree,
+        startDate: education.startDate,
+        endDate: education.endDate,
+      })
+      .from(education)
+      .innerJoin(cv, eq(cv.id, education.cvId))
+      .where(and(eq(education.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(education.sortOrder)),
+    db
+      .select({
+        id: skill.id,
+        sortOrder: skill.sortOrder,
+        name: skill.name,
+        category: skill.category,
+      })
+      .from(skill)
+      .innerJoin(cv, eq(cv.id, skill.cvId))
+      .where(and(eq(skill.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(skill.sortOrder)),
+    db
+      .select({
+        id: achievement.id,
+        sortOrder: achievement.sortOrder,
+        title: achievement.title,
+        issuer: achievement.issuer,
+        date: achievement.date,
+        description: achievement.description,
+      })
+      .from(achievement)
+      .innerJoin(cv, eq(cv.id, achievement.cvId))
+      .where(and(eq(achievement.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(achievement.sortOrder)),
+    db
+      .select({
+        id: reference.id,
+        sortOrder: reference.sortOrder,
+        name: reference.name,
+        role: reference.role,
+        company: reference.company,
+        email: reference.email,
+        phone: reference.phone,
+      })
+      .from(reference)
+      .innerJoin(cv, eq(cv.id, reference.cvId))
+      .where(and(eq(reference.cvId, id), eq(cv.userId, session.user.id)))
+      .orderBy(asc(reference.sortOrder)),
+  ])
 
   const [cvRow] = cvRows
 
@@ -132,6 +173,21 @@ export default async function EditCvPage({
       id: s.id,
       name: s.name,
       category: s.category,
+    })),
+    achievements: achievements.map((a) => ({
+      id: a.id,
+      title: a.title,
+      issuer: a.issuer,
+      date: a.date,
+      description: a.description,
+    })),
+    references: references.map((r) => ({
+      id: r.id,
+      name: r.name,
+      role: r.role,
+      company: r.company,
+      email: r.email,
+      phone: r.phone,
     })),
   }
 

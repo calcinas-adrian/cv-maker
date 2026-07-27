@@ -46,7 +46,7 @@ export type EditingProvider = {
   id: string
   provider: AiProviderId
   baseURL: string | null
-  defaultModel: string | null
+  modelId: string | null
 }
 
 type ProviderKeyDialogProps = {
@@ -56,11 +56,21 @@ type ProviderKeyDialogProps = {
 }
 
 /**
- * Add/update form for a single provider row. On edit, the API key field is
- * always blank and required again — the server never sends a decryptable
- * key back to the client (see `listProviderKeys`), so there is no
- * "unchanged, keep existing key" path; every save re-validates and
- * re-encrypts a freshly entered key.
+ * Add/update form for a single credential.
+ *
+ * On edit the API key field starts blank and is now OPTIONAL: leaving it
+ * empty means "keep the stored key". The server still never sends a
+ * decryptable key back to the client (see `listProviderKeys`, which only
+ * returns a mask), so the field cannot be pre-filled — but it no longer has
+ * to be re-entered either. Requiring it was a dead end: since the user
+ * cannot read their stored key from the app, changing any other setting
+ * pushed them to mint a fresh key at the provider just to get past this
+ * form.
+ *
+ * The model chosen here is registered against the credential. Adding FURTHER
+ * models to an existing credential is a separate, lighter flow that never
+ * touches the key at all — see `addProviderModel` and the "Agregar modelo"
+ * control in `provider-settings.tsx`.
  */
 export function ProviderKeyDialog({
   trigger,
@@ -77,7 +87,7 @@ export function ProviderKeyDialog({
       provider: editing?.provider ?? "anthropic",
       apiKey: "",
       baseURL: editing?.baseURL ?? undefined,
-      defaultModel: editing?.defaultModel ?? "",
+      modelId: editing?.modelId ?? "",
     },
   })
 
@@ -91,7 +101,7 @@ export function ProviderKeyDialog({
         provider: editing?.provider ?? "anthropic",
         apiKey: "",
         baseURL: editing?.baseURL ?? undefined,
-        defaultModel: editing?.defaultModel ?? "",
+        modelId: editing?.modelId ?? "",
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,7 +137,7 @@ export function ProviderKeyDialog({
           </DialogTitle>
           <DialogDescription>
             {editing
-              ? "Volvé a ingresar tu API key para actualizar — por seguridad, la anterior no se muestra."
+              ? "Dejá la API key vacía para conservar la actual — por seguridad no se muestra. Se valida contra el proveedor antes de guardarse."
               : "Se valida contra el proveedor antes de guardarse."}
           </DialogDescription>
         </DialogHeader>
@@ -152,7 +162,7 @@ export function ProviderKeyDialog({
                     value={field.value}
                     onValueChange={(value) => {
                       field.onChange(value)
-                      form.setValue("defaultModel", "")
+                      form.setValue("modelId", "")
                     }}
                     disabled={!!editing}
                   >
@@ -199,13 +209,24 @@ export function ProviderKeyDialog({
               name="apiKey"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>API key</FormLabel>
+                  <FormLabel>
+                    API key
+                    {editing ? (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        — opcional
+                      </span>
+                    ) : null}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="password"
                       autoComplete="off"
-                      placeholder={editing ? "••••••••••••" : ""}
+                      placeholder={
+                        editing ? "Dejala vacía para no cambiarla" : ""
+                      }
                       {...field}
+                      value={field.value ?? ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -215,10 +236,10 @@ export function ProviderKeyDialog({
 
             <FormField
               control={form.control}
-              name="defaultModel"
+              name="modelId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Modelo por defecto</FormLabel>
+                  <FormLabel>Modelo</FormLabel>
                   {provider === "compatible" ? (
                     <FormControl>
                       <Input placeholder="id del modelo" {...field} />

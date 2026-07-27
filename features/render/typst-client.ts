@@ -98,8 +98,13 @@ async function fetchTemplateSource(): Promise<string> {
   return response.text()
 }
 
+// `PageInfo` is a real class in the package's `internal.types.mjs`, but it is
+// NOT part of `main`'s public export list — importing it by name fails, so
+// this mirrors its shape (pt-unit page geometry) locally instead.
+export type PageInfo = { pageOffset: number; width: number; height: number }
+
 export type CompilePreviewResult =
-  { ok: true; svg: string } | { ok: false; error: string }
+  { ok: true; svg: string; pages: PageInfo[] } | { ok: false; error: string }
 
 /**
  * Compiles `data` + `theme` through `classic.typ` and renders the result to
@@ -140,16 +145,23 @@ export async function compilePreview(
       return { ok: false, error: message }
     }
 
-    const svg = await renderer.renderSvg({
-      format: "vector",
-      artifactContent: compileResult.result,
-    })
+    // `retrievePagesInfo` (needed for the page-divider overlay) only exists
+    // on a `RenderSession`, not on the stateless `renderer.renderSvg` call
+    // used before — `runWithSession` is what gets us both the SVG and the
+    // per-page geometry off the same decoded artifact.
+    const { svg, pages } = await renderer.runWithSession(
+      { format: "vector", artifactContent: compileResult.result },
+      async (session) => ({
+        pages: session.retrievePagesInfo(),
+        svg: await session.renderSvg({}),
+      }),
+    )
 
     if (typeof svg !== "string" || !svg.includes("<svg")) {
       return { ok: false, error: "El motor no generó una vista previa válida" }
     }
 
-    return { ok: true, svg }
+    return { ok: true, svg, pages }
   } catch (err) {
     console.error("Typst preview compile failed", err)
     return {

@@ -113,6 +113,14 @@ function reviewStateToCvData(state: ReviewState): CvData {
         name: item.data.name,
         category: item.data.category,
       })),
+    // Always empty: `cvExtractSchema` has no achievements/references output
+    // channel, so the model never produces them and there is nothing to
+    // review here. The user adds them by hand in the editor afterwards.
+    // Kept as explicit `[]` rather than omitted so this stays a visible
+    // decision — and so adding an extraction channel later fails loudly
+    // here instead of silently dropping the extracted rows.
+    achievements: [],
+    references: [],
   }
 }
 

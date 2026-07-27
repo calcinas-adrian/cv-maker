@@ -30,11 +30,16 @@ import {
  * type still accepts `system`, but it's `@deprecated` in favor of
  * `instructions` (same `string | SystemModelMessage | Array<SystemModelMessage>`
  * shape) — this uses the current, non-deprecated field. `maxRetries` (via
- * `RequestOptions`) and `maxOutputTokens` (not `maxTokens`) are confirmed
- * correct. `maxOutputTokens` is sized larger than the single-project
- * extraction (1024 there) since `cvImportExtractSchema` covers the whole
- * CV — basic info plus four item arrays — and a full resume can reasonably
- * produce many bullets across several jobs.
+ * `RequestOptions`) is confirmed correct.
+ *
+ * NO `maxOutputTokens` — this used to be 4096. Removed for the same reason
+ * as `features/cv-adapt/ai-extract.ts` (see that file's header for the full
+ * rationale): the output size scales with the source resume, so any single
+ * constant is a guess, and guessing low truncates the JSON mid-object and
+ * bills the tokens for a result that is then thrown away. The provider's
+ * own default now applies; `lib/ai/errors.ts` logs `finishReason` and
+ * `usage` on failure so that ceiling becomes visible the first time it is
+ * reached, and an explicit budget can then be set from measurements.
  */
 export async function extractCvFromDocumentText(
   model: LanguageModel,
@@ -55,7 +60,6 @@ presentes en la fuente: si falta información para un campo, dejalo vacío
 ("" o [] según corresponda) en vez de inventarlo.
 Respondé en ${languageInstruction}.`,
     prompt: `<document_text>\n${documentText}\n</document_text>`,
-    maxOutputTokens: 4096,
     maxRetries: 2,
   })
 

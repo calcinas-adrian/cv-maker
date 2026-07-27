@@ -4,14 +4,17 @@ import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Download, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { AdaptCvDialog } from "@/features/cv-adapt/adapt-dialog"
 import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { AutosaveIndicator } from "./autosave-indicator"
 import { CvEditorSkeleton } from "./cv-editor-skeleton"
 import { useEditorStore } from "./editor-store"
+import { AchievementSection } from "./sections/achievement-section"
 import { BasicInfoCard } from "./sections/basic-info-card"
 import { EducationSection } from "./sections/education-section"
 import { ExperienceSection } from "./sections/experience-section"
 import { ProjectSection } from "./sections/project-section"
+import { ReferenceSection } from "./sections/reference-section"
 import { SkillSection } from "./sections/skill-section"
 import { useAutosave } from "./use-autosave"
 import { useUndoRedoShortcuts } from "./use-undo-redo-shortcuts"
@@ -112,6 +115,7 @@ export function CvEditor({
               Descargar PDF
             </a>
           </Button>
+          <AdaptCvDialog cvId={cvId} />
         </div>
       </div>
 
@@ -166,6 +170,8 @@ export function CvEditor({
           <ProjectSection cvId={cvId} />
           <EducationSection />
           <SkillSection />
+          <AchievementSection />
+          <ReferenceSection />
           <VersionHistory cvId={cvId} />
         </div>
       ) : (

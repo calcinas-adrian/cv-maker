@@ -69,6 +69,45 @@ const sampleCv = {
     { id: "s3", name: "Docker", category: null },
     { id: "s4", name: "Diseño de APIs", category: null },
   ],
+  achievements: [
+    {
+      id: "a1",
+      title: "Primer puesto — Hackathon interno de plataforma",
+      issuer: "Tecnología Ñandú S.A.",
+      date: "Mar 2023",
+      description:
+        "Prototipo de observabilidad adoptado luego por tres equipos.",
+    },
+    // No issuer/date/description — verifies the header degrades cleanly to
+    // just a title, with no stray separators.
+    {
+      id: "a2",
+      title: "Ponente en NerdearLA",
+      issuer: null,
+      date: null,
+      description: null,
+    },
+  ],
+  references: [
+    {
+      id: "r1",
+      name: "Carla Giménez",
+      role: "Directora de Ingeniería",
+      company: "Tecnología Ñandú S.A.",
+      email: "carla.gimenez@example.com",
+      phone: "+54 9 11 4444-9876",
+    },
+    // Role but no company, and no phone — exercises both fallback branches
+    // of `ref-affiliation` and the contact-line filter.
+    {
+      id: "r2",
+      name: "Diego Álvarez",
+      role: "Tech Lead",
+      company: null,
+      email: "diego.alvarez@example.com",
+      phone: null,
+    },
+  ],
 }
 
 // Mirrors the serialization `features/render/actions.ts` performs: every
@@ -104,6 +143,19 @@ function toTypstPayload(cv) {
     skills: (cv.skills ?? []).map((s) => ({
       name: s.name ?? "",
       category: s.category ?? "",
+    })),
+    achievements: (cv.achievements ?? []).map((a) => ({
+      title: a.title ?? "",
+      issuer: a.issuer ?? "",
+      date: a.date ?? "",
+      description: a.description ?? "",
+    })),
+    references: (cv.references ?? []).map((r) => ({
+      name: r.name ?? "",
+      role: r.role ?? "",
+      company: r.company ?? "",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
     })),
   }
 }

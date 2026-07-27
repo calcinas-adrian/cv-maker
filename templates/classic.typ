@@ -34,6 +34,8 @@
 #let projects = data.at("projects", default: ())
 #let education = data.at("education", default: ())
 #let skills = data.at("skills", default: ())
+#let achievements = data.at("achievements", default: ())
+#let references = data.at("references", default: ())
 
 // -- Theme ---------------------------------------------------------------
 //
@@ -255,4 +257,57 @@
 #if skill-labels.len() > 0 [
   #section-title("Skills")
   #par(skill-labels.join("  ·  "))
+]
+
+// -- Achievements ----------------------------------------------------------
+
+#if achievements.len() > 0 [
+  #section-title("Achievements")
+  #for item in achievements [
+    #entry-header(
+      nz(item.at("title", default: "")),
+      nz(item.at("issuer", default: "")),
+      nz(item.at("date", default: "")),
+    )
+    #let achievement-description = nz(item.at("description", default: ""))
+    #if achievement-description != "" [
+      #text(size: 9.5pt)[#achievement-description]
+    ]
+    #v(0.35em)
+  ]
+]
+
+// -- References ------------------------------------------------------------
+
+#if references.len() > 0 [
+  #section-title("References")
+  #for item in references [
+    #let ref-role = nz(item.at("role", default: ""))
+    #let ref-company = nz(item.at("company", default: ""))
+    // `entry-header` takes a single subtitle slot, so role and company are
+    // folded into one string here rather than adding a fourth parameter
+    // that only this one section would ever use.
+    #let ref-affiliation = if ref-role != "" and ref-company != "" {
+      ref-role + " --- " + ref-company
+    } else if ref-role != "" {
+      ref-role
+    } else {
+      ref-company
+    }
+    #entry-header(
+      nz(item.at("name", default: "")),
+      ref-affiliation,
+      "",
+    )
+    // Shadows nothing: the header's `contact-parts` is a separate top-level
+    // binding, deliberately named differently to keep the two readable.
+    #let ref-contact = (
+      nz(item.at("email", default: "")),
+      nz(item.at("phone", default: "")),
+    ).filter(p => p != "")
+    #if ref-contact.len() > 0 [
+      #text(size: 9pt, fill: gray)[#ref-contact.join("  ·  ")]
+    ]
+    #v(0.35em)
+  ]
 ]

@@ -3,6 +3,7 @@
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CopyIcon,
   PencilIcon,
   TrashIcon,
 } from "lucide-react"
@@ -12,6 +13,7 @@ export function ItemRow({
   title,
   subtitle,
   onEdit,
+  onClone,
   onRemove,
   onMoveUp,
   onMoveDown,
@@ -21,6 +23,10 @@ export function ItemRow({
   title: string
   subtitle?: string
   onEdit: () => void
+  // Required, not optional: every section that renders an `ItemRow` should
+  // offer duplication, and making this mandatory is what forces TypeScript
+  // to flag a section that forgot to wire it up.
+  onClone: () => void
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
@@ -64,6 +70,15 @@ export function ItemRow({
           aria-label="Editar"
         >
           <PencilIcon />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClone}
+          aria-label="Duplicar"
+        >
+          <CopyIcon />
         </Button>
         <Button
           type="button"

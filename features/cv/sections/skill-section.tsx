@@ -53,6 +53,7 @@ export function SkillSection() {
   const updateSkill = useEditorStore((s) => s.updateSkill)
   const removeSkill = useEditorStore((s) => s.removeSkill)
   const moveSkill = useEditorStore((s) => s.moveSkill)
+  const duplicateSkill = useEditorStore((s) => s.duplicateSkill)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -111,6 +112,7 @@ export function SkillSection() {
               title={item.name ?? ""}
               subtitle={item.category ?? undefined}
               onEdit={() => openEditDialog(item)}
+              onClone={() => duplicateSkill(item.id, crypto.randomUUID())}
               onRemove={() => removeSkill(item.id)}
               onMoveUp={() => moveSkill(item.id, "up")}
               onMoveDown={() => moveSkill(item.id, "down")}

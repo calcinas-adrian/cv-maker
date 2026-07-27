@@ -33,6 +33,7 @@ export function ProjectSection({ cvId }: { cvId: string }) {
   const updateProject = useEditorStore((s) => s.updateProject)
   const removeProject = useEditorStore((s) => s.removeProject)
   const moveProject = useEditorStore((s) => s.moveProject)
+  const duplicateProject = useEditorStore((s) => s.duplicateProject)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -94,6 +95,7 @@ export function ProjectSection({ cvId }: { cvId: string }) {
               title={item.name ?? ""}
               subtitle={item.description}
               onEdit={() => openEditDialog(item)}
+              onClone={() => duplicateProject(item.id, crypto.randomUUID())}
               onRemove={() => removeProject(item.id)}
               onMoveUp={() => moveProject(item.id, "up")}
               onMoveDown={() => moveProject(item.id, "down")}

@@ -1,10 +1,11 @@
 "use server"
 
 import { headers } from "next/headers"
-import { APICallError, NoObjectGeneratedError, RetryError } from "ai"
+import { APICallError } from "ai"
 import { auth } from "@/lib/auth"
 import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
+import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
 import { getCvDraft } from "@/features/cv/actions"
 import type { Result } from "@/lib/result"
 import type {
@@ -27,39 +28,6 @@ import {
 async function getSessionUserId(): Promise<string | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   return session?.user.id ?? null
-}
-
-/**
- * `generateObject`'s `maxRetries` wraps the real provider failure in a
- * `RetryError` once retries are exhausted, exactly like `generateText` (see
- * `features/ai-providers/actions.ts`'s `unwrapRetryError` — this was fixed
- * there after retried provider errors were getting masked by the generic
- * fallback message below; unwrapping here too instead of reintroducing the
- * same bug for the `generateObject` call in `ai-extract.ts`).
- */
-function unwrapRetryError(err: unknown): unknown {
-  return RetryError.isInstance(err) ? err.lastError : err
-}
-
-function translateAiError(err: unknown): string {
-  const cause = unwrapRetryError(err)
-  if (APICallError.isInstance(cause)) {
-    if (cause.statusCode === 401 || cause.statusCode === 403) {
-      return "El proveedor de IA rechazó la clave configurada: revisala en Ajustes."
-    }
-    if (cause.statusCode === 429) {
-      return "El proveedor de IA devolvió un límite de uso (429). Probá de nuevo en un momento."
-    }
-    return `El proveedor de IA devolvió un error${cause.statusCode ? ` (${cause.statusCode})` : ""}.`
-  }
-  if (NoObjectGeneratedError.isInstance(cause)) {
-    return "El modelo no devolvió un resultado válido. Probá de nuevo."
-  }
-  console.error(
-    "AI project extraction failed",
-    cause instanceof Error ? cause.message : "unknown error",
-  )
-  return "No se pudo generar el proyecto con IA. Probá de nuevo."
 }
 
 export async function checkGithubConnection(): Promise<
@@ -256,6 +224,13 @@ export async function extractFromRepo(
           ? cause.message
           : "unknown error",
     )
-    return { ok: false, error: translateAiError(err), code: "provider_error" }
+    return {
+      ok: false,
+      error: translateAiError(err, {
+        logLabel: "AI project extraction failed",
+        fallback: "No se pudo generar el proyecto con IA. Probá de nuevo.",
+      }),
+      code: "provider_error",
+    }
   }
 }

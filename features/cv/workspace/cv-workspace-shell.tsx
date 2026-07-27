@@ -125,6 +125,9 @@ export function CvWorkspaceShell({
               projectCount={1}
               educationCount={1}
               skillCount={1}
+              // 0 on purpose — see `cv-workspace-shell-skeleton.tsx`.
+              achievementCount={0}
+              referenceCount={0}
               className="h-full"
             />
             <div className="text-muted-foreground absolute inset-x-0 bottom-4 text-center text-xs">
