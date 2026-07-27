@@ -1,5 +1,5 @@
 import "server-only"
-import { and, eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { db } from "@/db"
 import { aiProviderKey, aiProviderModel } from "@/db/schema"
 
@@ -15,12 +15,18 @@ import { aiProviderKey, aiProviderModel } from "@/db/schema"
  * write a query that silently operates on another user's row, so every
  * action that accepts a model id from a client goes through
  * `findOwnedProviderModel` instead of querying the table directly.
+ *
+ * Both helpers also enforce soft delete (`isNull(deletedAt)`), and the
+ * model helper enforces it on BOTH sides of the join: a model whose
+ * credential was deleted is unusable even if the model row itself is live,
+ * because it can no longer authenticate.
  */
 
 /**
- * Loads a model row together with the credential it belongs to, scoped to
- * the given user in a single query. A model id from another user matches
- * nothing rather than leaking the row.
+ * Loads a LIVE model row together with the LIVE credential it belongs to,
+ * scoped to the given user in a single query. A model id from another user
+ * — or one whose credential has been deleted — matches nothing rather than
+ * leaking the row.
  */
 export async function findOwnedProviderModel(
   providerModelId: string,
@@ -45,6 +51,8 @@ export async function findOwnedProviderModel(
       and(
         eq(aiProviderModel.id, providerModelId),
         eq(aiProviderKey.userId, userId),
+        isNull(aiProviderModel.deletedAt),
+        isNull(aiProviderKey.deletedAt),
       ),
     )
     .limit(1)
@@ -69,6 +77,7 @@ export async function findOwnedProviderKey(
       and(
         eq(aiProviderKey.id, providerKeyId),
         eq(aiProviderKey.userId, userId),
+        isNull(aiProviderKey.deletedAt),
       ),
     )
     .limit(1)

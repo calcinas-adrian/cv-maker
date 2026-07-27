@@ -109,7 +109,7 @@ export function ExperienceSection() {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar experiencia" : "Agregar experiencia"}

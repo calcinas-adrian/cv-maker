@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { ConfirmDeleteButton } from "@/components/ui/confirm-dialog"
 import {
   Select,
   SelectContent,
@@ -392,15 +393,16 @@ export function CareerMaterialManager({
                       >
                         Editar
                       </Button>
-                      <Button
-                        type="button"
+                      <ConfirmDeleteButton
                         size="sm"
                         variant="destructive"
                         disabled={pendingKey === row.id}
-                        onClick={() => handleDelete(row.id)}
+                        title="¿Eliminar este material?"
+                        description="Se quita del banco y deja de alimentar las adaptaciones con IA. Si lo habías guardado desde un CV, va a volver a aparecer en “Derivado de tus CVs”."
+                        onConfirm={() => handleDelete(row.id)}
                       >
                         Eliminar
-                      </Button>
+                      </ConfirmDeleteButton>
                     </CardAction>
                   </CardHeader>
                   <CardContent className="text-muted-foreground flex flex-col gap-1 text-sm">

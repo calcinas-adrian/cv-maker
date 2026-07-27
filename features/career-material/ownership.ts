@@ -1,6 +1,6 @@
 import "server-only"
 import { headers } from "next/headers"
-import { and, eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import { careerMaterial } from "@/db/schema"
@@ -19,17 +19,27 @@ export async function getSessionUserId(): Promise<string | null> {
 }
 
 /**
- * Mirrors `features/cv/ownership.ts`'s `findOwnedCv`: loads a
+ * Mirrors `features/cv/ownership.ts`'s `findOwnedCv`: loads a LIVE
  * `career_material` row scoped to both its id AND the given userId in a
  * single query. The id always comes from the client and is never trusted
  * alone — every mutation in `features/career-material/actions.ts` goes
  * through this first.
+ *
+ * `isNull(deletedAt)` lives here for the same reason it lives in
+ * `findOwnedCv`: one place decides what "exists" means, so an update or a
+ * delete can never land on a row the user already deleted.
  */
 export async function findOwnedMaterial(id: string, userId: string) {
   const [row] = await db
     .select()
     .from(careerMaterial)
-    .where(and(eq(careerMaterial.id, id), eq(careerMaterial.userId, userId)))
+    .where(
+      and(
+        eq(careerMaterial.id, id),
+        eq(careerMaterial.userId, userId),
+        isNull(careerMaterial.deletedAt),
+      ),
+    )
     .limit(1)
   return row ?? null
 }

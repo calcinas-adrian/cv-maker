@@ -64,6 +64,42 @@ export async function renameCv(
 }
 
 /**
+ * SOFT-deletes a CV: stamps `cv.deleted_at` and touches nothing else.
+ *
+ * Every child table, every `cv_version` snapshot and every `cv_adaptation`
+ * row is left exactly as it is. That is the whole design — because nothing
+ * is destroyed, recovery is a single `UPDATE ... SET deleted_at = NULL`
+ * (see `scripts/restore.mjs`) and the CV comes back with its sections,
+ * history and provenance intact. There is deliberately no trash UI: this
+ * app's recovery path is the owner running that script on request.
+ *
+ * A side effect worth knowing: `cv_adaptation.sourceCvId` is declared
+ * `onDelete: "set null"`, so a hard delete here used to silently erase the
+ * link between an adapted CV and the CV it came from. Soft delete never
+ * fires that FK action, so deleting a source CV now PRESERVES the
+ * provenance of everything derived from it.
+ *
+ * `updatedAt` is deliberately not touched, same reasoning as `renameCv`:
+ * deleting is not a content edit and must not collide with `saveDraft`'s
+ * optimistic-concurrency check.
+ */
+export async function deleteCv(cvId: string): Promise<Result<{ id: string }>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  // `findOwnedCv` already excludes soft-deleted rows, so deleting the same
+  // CV twice reports "No encontrado" rather than silently re-stamping a
+  // newer `deleted_at` over the original deletion time.
+  const owned = await findOwnedCv(cvId, userId)
+  if (!owned) return { ok: false, error: "No encontrado", code: "not_found" }
+
+  await db.update(cv).set({ deletedAt: new Date() }).where(eq(cv.id, cvId))
+
+  return { ok: true, data: { id: cvId } }
+}
+
+/**
  * Reads the full CvData shape for a cv, verifying ownership first.
  *
  * Used internally by `saveVersion` to build a snapshot. The `/cv/[id]/edit`

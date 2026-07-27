@@ -1,5 +1,5 @@
 import "server-only"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq, isNull } from "drizzle-orm"
 import { db } from "@/db"
 import { cv } from "@/db/schema"
 
@@ -18,9 +18,13 @@ export type CvListItem = {
  * `sdd/cv-editor-panel/design` Decision 1 / File Changes table.
  */
 export async function listUserCvs(userId: string): Promise<CvListItem[]> {
-  return db
-    .select({ id: cv.id, title: cv.title, updatedAt: cv.updatedAt })
-    .from(cv)
-    .where(eq(cv.userId, userId))
-    .orderBy(desc(cv.updatedAt))
+  return (
+    db
+      .select({ id: cv.id, title: cv.title, updatedAt: cv.updatedAt })
+      .from(cv)
+      // Soft-deleted CVs are invisible everywhere in the UI — this one filter
+      // covers both the dashboard list and the sidebar.
+      .where(and(eq(cv.userId, userId), isNull(cv.deletedAt)))
+      .orderBy(desc(cv.updatedAt))
+  )
 }

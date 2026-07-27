@@ -7,14 +7,15 @@ import { Loader2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -215,23 +216,23 @@ export function ImportFromFileDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetTrigger asChild>
         <Button type="button" size="sm" variant="outline">
           <UploadIcon /> Importar de archivo
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Importar CV desde un archivo</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent size="lg">
+        <SheetHeader>
+          <SheetTitle>Importar CV desde un archivo</SheetTitle>
+          <SheetDescription>
             Subí tu CV en PDF o DOCX — la IA arma un borrador que podés revisar
             acá y terminar de editar en el editor completo.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {step.name === "pick" ? (
-          <div className="flex flex-col gap-2">
+          <SheetBody className="flex flex-col gap-2">
             <Label htmlFor="cv-file-input">Archivo (PDF o DOCX)</Label>
             <input
               id="cv-file-input"
@@ -240,110 +241,118 @@ export function ImportFromFileDialog() {
               onChange={handleFileChange}
               className="file:bg-secondary file:text-secondary-foreground text-muted-foreground text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
-          </div>
+          </SheetBody>
         ) : step.name === "extracting" ? (
-          <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+          <SheetBody className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2Icon className="size-4 animate-spin" />
             Extrayendo información de {step.fileName}…
-          </div>
+          </SheetBody>
         ) : step.name === "review" ? (
-          <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="import-fullName">Nombre completo</Label>
-                  <Input
-                    id="import-fullName"
-                    value={step.basicInfo.fullName}
-                    onChange={(e) =>
-                      updateBasicInfo({ fullName: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="import-email">Email</Label>
-                  <Input
-                    id="import-email"
-                    type="email"
-                    value={step.basicInfo.email}
-                    onChange={(e) => updateBasicInfo({ email: e.target.value })}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="import-phone">Teléfono</Label>
-                  <Input
-                    id="import-phone"
-                    value={step.basicInfo.phone}
-                    onChange={(e) => updateBasicInfo({ phone: e.target.value })}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="import-location">Ubicación</Label>
-                  <Input
-                    id="import-location"
-                    value={step.basicInfo.location}
-                    onChange={(e) =>
-                      updateBasicInfo({ location: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="import-summary">Resumen</Label>
-                <Textarea
-                  id="import-summary"
-                  rows={3}
-                  value={step.basicInfo.summary}
-                  onChange={(e) => updateBasicInfo({ summary: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {(
-              [
-                ["experiences", "Experiencia"],
-                ["projects", "Proyectos"],
-                ["education", "Educación"],
-                ["skills", "Habilidades"],
-              ] as const
-            ).map(([section, label]) => {
-              const items = step[section]
-              if (items.length === 0) return null
-              return (
-                <div key={section} className="flex flex-col gap-2">
-                  <p className="text-sm font-medium">
-                    {label}{" "}
-                    <span className="text-muted-foreground font-normal">
-                      ({items.filter((i) => i.included).length}/{items.length})
-                    </span>
-                  </p>
+          <>
+            <SheetBody className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
-                    {items.map((item) => {
-                      const { title, subtitle } = describeItem(
-                        section,
-                        item.data,
-                      )
-                      return (
-                        <ReviewItemRow
-                          key={item.id}
-                          title={title}
-                          subtitle={subtitle}
-                          included={item.included}
-                          onToggle={() => toggleItem(section, item.id)}
-                        />
-                      )
-                    })}
+                    <Label htmlFor="import-fullName">Nombre completo</Label>
+                    <Input
+                      id="import-fullName"
+                      value={step.basicInfo.fullName}
+                      onChange={(e) =>
+                        updateBasicInfo({ fullName: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="import-email">Email</Label>
+                    <Input
+                      id="import-email"
+                      type="email"
+                      value={step.basicInfo.email}
+                      onChange={(e) =>
+                        updateBasicInfo({ email: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="import-phone">Teléfono</Label>
+                    <Input
+                      id="import-phone"
+                      value={step.basicInfo.phone}
+                      onChange={(e) =>
+                        updateBasicInfo({ phone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="import-location">Ubicación</Label>
+                    <Input
+                      id="import-location"
+                      value={step.basicInfo.location}
+                      onChange={(e) =>
+                        updateBasicInfo({ location: e.target.value })
+                      }
+                    />
                   </div>
                 </div>
-              )
-            })}
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="import-summary">Resumen</Label>
+                  <Textarea
+                    id="import-summary"
+                    rows={3}
+                    value={step.basicInfo.summary}
+                    onChange={(e) =>
+                      updateBasicInfo({ summary: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
 
-            <p className="text-muted-foreground text-xs">
-              Después de crear el CV vas a poder editar cada sección en detalle
-              desde el editor.
-            </p>
+              {(
+                [
+                  ["experiences", "Experiencia"],
+                  ["projects", "Proyectos"],
+                  ["education", "Educación"],
+                  ["skills", "Habilidades"],
+                ] as const
+              ).map(([section, label]) => {
+                const items = step[section]
+                if (items.length === 0) return null
+                return (
+                  <div key={section} className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">
+                      {label}{" "}
+                      <span className="text-muted-foreground font-normal">
+                        ({items.filter((i) => i.included).length}/{items.length}
+                        )
+                      </span>
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {items.map((item) => {
+                        const { title, subtitle } = describeItem(
+                          section,
+                          item.data,
+                        )
+                        return (
+                          <ReviewItemRow
+                            key={item.id}
+                            title={title}
+                            subtitle={subtitle}
+                            included={item.included}
+                            onToggle={() => toggleItem(section, item.id)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
 
-            <DialogFooter>
+              <p className="text-muted-foreground text-xs">
+                Después de crear el CV vas a poder editar cada sección en
+                detalle desde el editor.
+              </p>
+            </SheetBody>
+            <SheetFooter>
               <Button
                 type="button"
                 disabled={isCreating}
@@ -351,21 +360,23 @@ export function ImportFromFileDialog() {
               >
                 {isCreating ? "Creando…" : "Crear CV"}
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         ) : (
-          <div className="flex flex-col gap-3">
-            {step.code === "provider_not_configured" ? (
-              <p className="text-sm">
-                {step.message}{" "}
-                <Link href="/settings" className="underline">
-                  Ir a Ajustes
-                </Link>
-              </p>
-            ) : (
-              <p className="text-destructive text-sm">{step.message}</p>
-            )}
-            <DialogFooter>
+          <>
+            <SheetBody className="flex flex-col gap-3">
+              {step.code === "provider_not_configured" ? (
+                <p className="text-sm">
+                  {step.message}{" "}
+                  <Link href="/settings" className="underline">
+                    Ir a Ajustes
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-destructive text-sm">{step.message}</p>
+              )}
+            </SheetBody>
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -373,11 +384,11 @@ export function ImportFromFileDialog() {
               >
                 Volver
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 

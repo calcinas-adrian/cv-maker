@@ -97,6 +97,14 @@ export const passkey = pgTable("passkey", {
  * `education`, and `skill` are simple ordered child records owned by a `cv`.
  * `cv_version` stores full JSON snapshots of a CV's editable data for undo
  * history / restore, independent of the live `cv` row and its children.
+ *
+ * DELETION POLICY. `cv` is soft-deleted (`deleted_at`); its children are
+ * not, and must not be. `features/cv/persist-sections.ts` rewrites every
+ * child table on EVERY autosave via delete-all + reinsert, so a
+ * `deleted_at` on a child would accumulate a dead row per item per save
+ * and grow without bound. Undo for an individual section item is already
+ * covered by `cv_version` snapshots + `restoreVersion`, which is the right
+ * granularity for "I removed a bullet by accident".
  */
 
 export const cv = pgTable("cv", {
@@ -118,6 +126,17 @@ export const cv = pgTable("cv", {
   theme: jsonb("theme").$type<CvTheme>(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Soft delete. NULL = live, non-NULL = the user deleted it. Nothing in
+  // the app ever hard-deletes a cv row: "delete" in the UI sets this, and
+  // recovery is a manual, out-of-band request (see `scripts/restore.ts`).
+  //
+  // The child tables below deliberately do NOT get this column, and that
+  // is what makes restore trivial: soft-deleting a cv touches no child
+  // row, so setting this back to NULL brings the sections, versions and
+  // adaptations back exactly as they were. See the note on
+  // `buildCvSectionQueries` in `features/cv/persist-sections.ts` for why
+  // the children cannot carry a `deleted_at` of their own.
+  deletedAt: timestamp("deleted_at"),
 })
 
 export const experience = pgTable("experience", {
@@ -200,6 +219,12 @@ export const reference = pgTable("reference", {
   phone: text("phone"),
 })
 
+// No `deleted_at` here on purpose. The only delete that touches this table
+// is the automatic prune of stale unlabeled snapshots in
+// `features/cv/actions.ts` — that prune IS this table's garbage collector,
+// and soft-deleting from it would defeat the one job it has (bounding
+// growth). Labeled versions are never pruned, and the user has no UI to
+// delete a version, so nothing here is an accidental user deletion.
 export const cvVersion = pgTable("cv_version", {
   id: text("id").primaryKey(),
   cvId: text("cv_id")
@@ -251,6 +276,11 @@ export const careerMaterial = pgTable("career_material", {
   tags: jsonb("tags").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // Soft delete — see the note on `cv.deletedAt`. Bank items are hand-written
+  // by the user and cannot be recovered from anywhere else (unlike a derived
+  // item, which `listDerivedMaterial` can always recompute from a CV), so
+  // this is exactly the case where an accidental click is expensive.
+  deletedAt: timestamp("deleted_at"),
 })
 
 /**
@@ -280,6 +310,16 @@ export const aiProviderKey = pgTable("ai_provider_key", {
   baseURL: text("base_url"), // only for "compatible"
   lastValidatedAt: timestamp("last_validated_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Soft delete — see the note on `cv.deletedAt`. Be aware of what this
+  // means HERE specifically, because it differs from the other tables: a
+  // soft-deleted credential still holds `encrypted_key`, so the ciphertext
+  // of an API key the user "removed" stays in the database until someone
+  // purges it out of band. That is a deliberate, owner-accepted trade for a
+  // personal-use deployment — re-entering a provider key means minting a
+  // new one at the provider, which is the exact cost this policy avoids.
+  // If this app is ever shared beyond that, revisit this column first:
+  // a revoked credential is the one thing users expect to actually vanish.
+  deletedAt: timestamp("deleted_at"),
 })
 
 /**
@@ -322,6 +362,18 @@ export const aiProviderModel = pgTable(
     isDefault: boolean("is_default").notNull().default(false),
     lastValidatedAt: timestamp("last_validated_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    // Soft delete — see the note on `cv.deletedAt`.
+    //
+    // This column interacts with the unique index below, and the resolution
+    // is worth stating: the index stays UNPARTITIONED (no
+    // `WHERE deleted_at IS NULL`) on purpose. A partial index would let a
+    // second live row for the same (key, model) pair be inserted alongside
+    // the soft-deleted one, silently accumulating duplicates. Instead,
+    // re-registering a model that was soft-deleted REVIVES the existing row
+    // (`deleted_at` back to NULL) via `onConflictDoUpdate` — see
+    // `addProviderModel` and `saveProviderKey`. One row per pair, forever,
+    // and re-adding something you deleted by accident just works.
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     uniqueIndex("ai_provider_model_key_model_unique").on(

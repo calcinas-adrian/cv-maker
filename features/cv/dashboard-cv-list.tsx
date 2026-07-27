@@ -3,10 +3,13 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { PencilIcon } from "lucide-react"
+import { PencilIcon, Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { ConfirmDeleteButton } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
+import { deleteCv } from "@/features/cv/actions"
 import type { CvListItem } from "@/features/cv/list"
 import { useInlineCvRename } from "@/features/cv/use-inline-cv-rename"
 
@@ -20,6 +23,24 @@ export function DashboardCvList({ cvs }: { cvs: CvListItem[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingId, setPendingId] = useState<string | null>(null)
+  // Deleted ids are hidden locally so the card disappears on confirm without
+  // waiting for the server round trip to re-render the RSC list — same
+  // optimistic-override idea `useInlineCvRename` uses for titles.
+  const [deletedIds, setDeletedIds] = useState<string[]>([])
+
+  async function handleDelete(id: string) {
+    const result = await deleteCv(id)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    setDeletedIds((prev) => [...prev, id])
+    toast.success("CV eliminado")
+    // Refreshes the sidebar too — it renders from the same `listUserCvs`.
+    router.refresh()
+  }
+
+  const visible = cvs.filter((item) => !deletedIds.includes(item.id))
 
   const {
     titleFor,
@@ -32,7 +53,7 @@ export function DashboardCvList({ cvs }: { cvs: CvListItem[] }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {cvs.map((item) =>
+      {visible.map((item) =>
         editingId === item.id ? (
           <Card key={item.id}>
             <CardHeader>
@@ -87,25 +108,61 @@ export function DashboardCvList({ cvs }: { cvs: CvListItem[] }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-1">
                   <span className="min-w-0 truncate">{titleFor(item)}</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Renombrar CV"
-                    className="text-muted-foreground hover:text-foreground ml-auto hidden shrink-0 group-hover:block"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      startEditing(item)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Renombrar CV"
+                      className="text-muted-foreground hover:text-foreground hidden group-hover:block"
+                      onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         startEditing(item)
-                      }
-                    }}
-                  >
-                    <PencilIcon className="size-3.5" />
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startEditing(item)
+                        }
+                      }}
+                    >
+                      <PencilIcon className="size-3.5" />
+                    </span>
+                    {/* This whole subtree sits inside the card's `Link`, so
+                        every click under it has to be stopped or it would
+                        navigate to the editor. That includes clicks inside
+                        the confirmation dialog: Radix portals the dialog out
+                        of this DOM subtree, but React events still bubble
+                        along the COMPONENT tree, so "Cancelar" would
+                        otherwise open the CV it was cancelling. Stopping it
+                        here covers the button and the dialog in one place. */}
+                    <span
+                      className="contents"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    >
+                      <ConfirmDeleteButton
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label="Eliminar CV"
+                        className="text-muted-foreground hover:text-destructive hidden group-hover:inline-flex"
+                        title="¿Eliminar este CV?"
+                        description={
+                          <>
+                            <strong>{titleFor(item)}</strong> deja de aparecer
+                            en tu lista. No se borra del servidor: su historial
+                            de versiones y sus adaptaciones quedan guardados, y
+                            podés pedir que lo restauren.
+                          </>
+                        }
+                        onConfirm={() => handleDelete(item.id)}
+                      >
+                        <Trash2Icon />
+                      </ConfirmDeleteButton>
+                    </span>
                   </span>
                 </CardTitle>
               </CardHeader>

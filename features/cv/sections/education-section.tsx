@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -134,52 +135,23 @@ export function EducationSection() {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar educación" : "Agregar educación"}
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="flex flex-col gap-3"
-            >
-              <FormField
-                control={form.control}
-                name="institution"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Institución</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="degree"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Título</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+              <DialogBody className="flex flex-col gap-3">
                 <FormField
                   control={form.control}
-                  name="startDate"
+                  name="institution"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Inicio</FormLabel>
+                      <FormLabel>Institución</FormLabel>
                       <FormControl>
-                        <Input placeholder="2018" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -187,18 +159,46 @@ export function EducationSection() {
                 />
                 <FormField
                   control={form.control}
-                  name="endDate"
+                  name="degree"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fin</FormLabel>
+                      <FormLabel>Título</FormLabel>
                       <FormControl>
-                        <Input placeholder="2022" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Inicio</FormLabel>
+                        <FormControl>
+                          <Input placeholder="2018" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fin</FormLabel>
+                        <FormControl>
+                          <Input placeholder="2022" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </DialogBody>
               <DialogFooter>
                 <Button type="submit">Guardar</Button>
               </DialogFooter>

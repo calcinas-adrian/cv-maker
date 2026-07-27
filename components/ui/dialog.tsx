@@ -7,6 +7,20 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+/**
+ * Width scale. Dialogs are content-driven: a two-field form and a multi-step
+ * review of a whole CV should not share a width. `md` is the default because
+ * the previous single `sm` (384px) cramped every form in the app.
+ */
+const dialogSizes = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+} as const
+
+type DialogSize = keyof typeof dialogSizes
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -47,12 +61,22 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Owns the frame, not the padding: `DialogHeader` / `DialogBody` /
+ * `DialogFooter` each pad themselves so the body can scroll edge-to-edge
+ * while the header and footer stay pinned. Long content therefore scrolls
+ * inside the dialog instead of pushing it past the viewport.
+ *
+ * `100dvh` (not `100vh`) so mobile browser chrome does not eat the footer.
+ */
 function DialogContent({
   className,
   children,
+  size = "md",
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: DialogSize
   showCloseButton?: boolean
 }) {
   return (
@@ -61,7 +85,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-popover text-popover-foreground border-border data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border p-4 text-sm duration-100 outline-none sm:max-w-sm",
+          "bg-popover text-popover-foreground border-border data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border text-sm duration-100 outline-none sm:max-h-[calc(100dvh-4rem)]",
+          dialogSizes[size],
           className,
         )}
         {...props}
@@ -71,7 +96,7 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className="absolute top-3 right-3"
               size="icon-sm"
             >
               <XIcon />
@@ -84,11 +109,26 @@ function DialogContent({
   )
 }
 
+/** `pr-12` keeps the title clear of the absolutely-positioned close button. */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex shrink-0 flex-col gap-2 px-5 pt-5 pr-12", className)}
+      {...props}
+    />
+  )
+}
+
+/**
+ * The only scrollable region. `min-h-0` is required: without it a flex child
+ * refuses to shrink below its content size and the scroll never engages.
+ */
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-5", className)}
       {...props}
     />
   )
@@ -106,7 +146,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "bg-muted/50 -mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-lg border-t p-4 sm:flex-row sm:justify-end",
+        "bg-muted/50 flex shrink-0 flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end",
         className,
       )}
       {...props}
@@ -155,6 +195,7 @@ function DialogDescription({
 
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,
@@ -165,3 +206,4 @@ export {
   DialogTitle,
   DialogTrigger,
 }
+export type { DialogSize }

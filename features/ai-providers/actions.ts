@@ -1,7 +1,7 @@
 "use server"
 
 import { headers } from "next/headers"
-import { and, asc, desc, eq } from "drizzle-orm"
+import { and, asc, desc, eq, isNull } from "drizzle-orm"
 import { generateText, APICallError, RetryError } from "ai"
 import { createId } from "@paralleldrive/cuid2"
 import type { BatchItem } from "drizzle-orm/batch"
@@ -163,7 +163,9 @@ export async function listProviderKeys(): Promise<
     db
       .select()
       .from(aiProviderKey)
-      .where(eq(aiProviderKey.userId, userId))
+      .where(
+        and(eq(aiProviderKey.userId, userId), isNull(aiProviderKey.deletedAt)),
+      )
       .orderBy(desc(aiProviderKey.createdAt)),
     db
       .select({
@@ -179,8 +181,17 @@ export async function listProviderKeys(): Promise<
         eq(aiProviderModel.providerKeyId, aiProviderKey.id),
       )
       // Ownership rides on the join, not on the model id — this table has no
-      // `userId` of its own.
-      .where(eq(aiProviderKey.userId, userId))
+      // `userId` of its own. The credential's own `deleted_at` is checked
+      // too: soft-deleting a key hides its models without touching them (see
+      // `deleteProviderKey`), so the key-side filter is what makes them
+      // disappear here.
+      .where(
+        and(
+          eq(aiProviderKey.userId, userId),
+          isNull(aiProviderModel.deletedAt),
+          isNull(aiProviderKey.deletedAt),
+        ),
+      )
       .orderBy(desc(aiProviderModel.isDefault), asc(aiProviderModel.createdAt)),
   ])
 
@@ -302,9 +313,12 @@ export async function saveProviderKey(
       )
 
     // The edited model is registered if it is not already on this
-    // credential. `onConflictDoNothing` against the composite unique index
-    // makes re-saving the same model a no-op instead of an error, so the
-    // edit form stays idempotent.
+    // credential. `onConflictDoUpdate` against the composite unique index
+    // keeps the edit form idempotent AND doubles as the revive path: if
+    // this exact model was soft-deleted earlier, re-saving it here clears
+    // `deleted_at` instead of failing on the unique index or quietly doing
+    // nothing. One row per (credential, model) pair, always — see the note
+    // on `deletedAt` in `db/schema.ts`.
     await db
       .insert(aiProviderModel)
       .values({
@@ -313,8 +327,9 @@ export async function saveProviderKey(
         modelId: data.modelId,
         lastValidatedAt: now,
       })
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [aiProviderModel.providerKeyId, aiProviderModel.modelId],
+        set: { deletedAt: null, lastValidatedAt: now },
       })
 
     return { ok: true, data: { id: data.id } }
@@ -376,23 +391,26 @@ export async function addProviderModel(
   })
   if (!validation.ok) return validation
 
-  const id = createId()
-  const inserted = await db
-    .insert(aiProviderModel)
-    .values({
-      id,
-      providerKeyId: data.providerKeyId,
-      modelId: data.modelId,
-      lastValidatedAt: new Date(),
-    })
-    .onConflictDoNothing({
-      target: [aiProviderModel.providerKeyId, aiProviderModel.modelId],
-    })
+  // A row may already exist for this (credential, model) pair in one of two
+  // very different states, and they need opposite outcomes:
+  //   - live      -> nothing to do, and saying "added" would be a lie
+  //   - soft-deleted -> the user is re-adding something they removed, which
+  //                     is precisely the flow soft delete exists to make
+  //                     painless, so revive it and report success
+  // Checked explicitly rather than inferred from the upsert's `rowCount`,
+  // because `onConflictDoUpdate` reports 1 for both cases.
+  const [existingRow] = await db
+    .select({ id: aiProviderModel.id, deletedAt: aiProviderModel.deletedAt })
+    .from(aiProviderModel)
+    .where(
+      and(
+        eq(aiProviderModel.providerKeyId, data.providerKeyId),
+        eq(aiProviderModel.modelId, data.modelId),
+      ),
+    )
+    .limit(1)
 
-  // `onConflictDoNothing` turns a duplicate into a silent no-op, which would
-  // otherwise read to the user as "added" while nothing appeared. Report it
-  // as an explicit, actionable outcome instead.
-  if (inserted.rowCount === 0) {
+  if (existingRow && !existingRow.deletedAt) {
     return {
       ok: false,
       error: "Ese modelo ya está registrado para esta clave.",
@@ -400,18 +418,44 @@ export async function addProviderModel(
     }
   }
 
-  return { ok: true, data: { id } }
+  const id = createId()
+  await db
+    .insert(aiProviderModel)
+    .values({
+      id,
+      providerKeyId: data.providerKeyId,
+      modelId: data.modelId,
+      lastValidatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [aiProviderModel.providerKeyId, aiProviderModel.modelId],
+      set: { deletedAt: null, lastValidatedAt: new Date() },
+    })
+
+  // The revived row keeps its ORIGINAL id — `id` above was only used for the
+  // insert branch — so callers get the id that actually exists in the table.
+  return { ok: true, data: { id: existingRow?.id ?? id } }
 }
 
 /**
- * Deletes ONE model, leaving its credential and every sibling model intact.
- * This is the operation the cascade on `ai_provider_model.providerKeyId`
- * would otherwise make impossible to express.
+ * SOFT-deletes ONE model, leaving its credential and every sibling model
+ * intact. This is the operation the cascade on
+ * `ai_provider_model.providerKeyId` would otherwise make impossible to
+ * express.
  *
- * Refuses to remove the last model on a credential: a credential with no
- * models cannot be used by anything and would sit in the UI looking
+ * Refuses to remove the last LIVE model on a credential: a credential with
+ * no models cannot be used by anything and would sit in the UI looking
  * configured while silently never being selectable. Deleting the credential
- * itself is the intended way to get rid of it.
+ * itself is the intended way to get rid of it. The sibling count filters on
+ * `deleted_at` — previously-deleted models are not usable, so counting them
+ * would let a user strand a credential with zero live models.
+ *
+ * `isDefault` is deliberately NOT cleared here. It stays on the dead row and
+ * comes back if the model is ever revived, which is what a user re-adding a
+ * model they deleted by accident would expect. This cannot produce two
+ * defaults, because `clearDefaultModelQuery` intentionally clears the flag
+ * across ALL of the user's models, deleted ones included — so the moment
+ * another model is promoted, the dead row's flag is cleared with it.
  */
 export async function deleteProviderModel(id: string): Promise<Result<true>> {
   const userId = await getSessionUserId()
@@ -424,7 +468,12 @@ export async function deleteProviderModel(id: string): Promise<Result<true>> {
   const siblings = await db
     .select({ id: aiProviderModel.id })
     .from(aiProviderModel)
-    .where(eq(aiProviderModel.providerKeyId, owned.providerKeyId))
+    .where(
+      and(
+        eq(aiProviderModel.providerKeyId, owned.providerKeyId),
+        isNull(aiProviderModel.deletedAt),
+      ),
+    )
 
   if (siblings.length <= 1) {
     return {
@@ -435,7 +484,10 @@ export async function deleteProviderModel(id: string): Promise<Result<true>> {
     }
   }
 
-  await db.delete(aiProviderModel).where(eq(aiProviderModel.id, id))
+  await db
+    .update(aiProviderModel)
+    .set({ deletedAt: new Date() })
+    .where(eq(aiProviderModel.id, id))
 
   return { ok: true, data: true }
 }
@@ -473,26 +525,34 @@ export async function setDefaultProviderModel(
 }
 
 /**
- * Deletes a configured provider row, scoped to the current user — a
+ * SOFT-deletes a configured credential, scoped to the current user — a
  * client-supplied id from another user's row matches zero rows and is
  * reported as "No encontrado" rather than silently no-op'd, so the UI can
  * distinguish "deleted" from "nothing happened".
+ *
+ * Its models are deliberately left untouched, exactly like `cv`'s children:
+ * every read path joins back to the credential and filters on ITS
+ * `deleted_at` (see `findOwnedProviderModel`, `listProviderKeys`,
+ * `getConfiguredModelForUser`, `listUserModelOptions`), so the models are
+ * already unusable and invisible. That keeps restore a single UPDATE —
+ * clearing `deleted_at` here brings the whole credential back with every
+ * model it had.
+ *
+ * NOTE: the row retains `encrypted_key`. See the column comment in
+ * `db/schema.ts` — this is an accepted trade for this deployment, not an
+ * oversight.
  */
 export async function deleteProviderKey(id: string): Promise<Result<true>> {
   const userId = await getSessionUserId()
   if (!userId)
     return { ok: false, error: "No autenticado", code: "unauthenticated" }
 
-  const [existing] = await db
-    .select({ id: aiProviderKey.id })
-    .from(aiProviderKey)
-    .where(and(eq(aiProviderKey.id, id), eq(aiProviderKey.userId, userId)))
-    .limit(1)
-
+  const existing = await findOwnedProviderKey(id, userId)
   if (!existing) return { ok: false, error: "No encontrado", code: "not_found" }
 
   await db
-    .delete(aiProviderKey)
+    .update(aiProviderKey)
+    .set({ deletedAt: new Date() })
     .where(and(eq(aiProviderKey.id, id), eq(aiProviderKey.userId, userId)))
 
   return { ok: true, data: true }

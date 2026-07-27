@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { DialogFooter } from "@/components/ui/dialog"
+import { DialogBody, DialogFooter } from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -81,8 +81,13 @@ export function formValuesToExperienceItem(
  * Presentational form only — deliberately has no `<Dialog>`/`<DialogContent>`
  * wrapper of its own, same reasoning as `ProjectForm`: `ExperienceSection`
  * renders it inside its own Dialog; the GitHub-import review step renders it
- * as a step inside ITS dialog, so the chrome stays the caller's
- * responsibility and only the fields + submit button are shared here.
+ * inside ITS sheet, so the shell stays the caller's responsibility and only
+ * the fields + submit button are shared here.
+ *
+ * It DOES own its `DialogBody`/`DialogFooter` pair, so it must be mounted as
+ * a direct child of a dialog or sheet shell — never nested inside another
+ * body, which would stack two scroll containers. Callers that need to show
+ * something above the fields pass it through `notice` rather than wrapping.
  */
 export function ExperienceForm({
   defaultValues,
@@ -104,46 +109,21 @@ export function ExperienceForm({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-3"
-      >
-        {notice}
-        <FormField
-          control={form.control}
-          name="company"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Empresa</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Puesto</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="grid grid-cols-2 gap-3">
+      {/* `contents` so the form box disappears from layout and `DialogBody` /
+          `DialogFooter` become direct flex children of the dialog (or sheet)
+          shell — the body scrolls, the submit row stays pinned — while the
+          submit button remains inside the form element. */}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+        <DialogBody className="flex flex-col gap-3">
+          {notice}
           <FormField
             control={form.control}
-            name="startDate"
+            name="company"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Inicio</FormLabel>
+                <FormLabel>Empresa</FormLabel>
                 <FormControl>
-                  <Input placeholder="Ene 2022" {...field} />
+                  <Input {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -151,31 +131,59 @@ export function ExperienceForm({
           />
           <FormField
             control={form.control}
-            name="endDate"
+            name="role"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Fin</FormLabel>
+                <FormLabel>Puesto</FormLabel>
                 <FormControl>
-                  <Input placeholder="Actualidad" {...field} />
+                  <Input {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
-        <FormField
-          control={form.control}
-          name="bulletsText"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Viñetas (una por línea)</FormLabel>
-              <FormControl>
-                <Textarea rows={4} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inicio</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ene 2022" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fin</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Actualidad" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="bulletsText"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Viñetas (una por línea)</FormLabel>
+                <FormControl>
+                  <Textarea rows={4} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </DialogBody>
         <DialogFooter>
           <Button type="submit" disabled={submitDisabled}>
             {submitLabel}

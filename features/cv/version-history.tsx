@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -99,15 +100,17 @@ export function VersionHistory({ cvId }: { cvId: string }) {
                 Nombrar esta versión
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent size="sm">
               <DialogHeader>
                 <DialogTitle>Nombrar esta versión</DialogTitle>
               </DialogHeader>
-              <Input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="ej. Antes de postularme a Acme"
-              />
+              <DialogBody>
+                <Input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="ej. Antes de postularme a Acme"
+                />
+              </DialogBody>
               <DialogFooter>
                 <Button
                   type="button"

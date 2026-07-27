@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -133,74 +134,76 @@ export function AchievementSection() {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar logro" : "Agregar logro"}
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="flex flex-col gap-3"
-            >
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Título</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Primer puesto en el hackathon interno"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+              <DialogBody className="flex flex-col gap-3">
                 <FormField
                   control={form.control}
-                  name="issuer"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Otorgado por</FormLabel>
+                      <FormLabel>Título</FormLabel>
                       <FormControl>
-                        <Input placeholder="Empresa, institución…" {...field} />
+                        <Input
+                          placeholder="Primer puesto en el hackathon interno"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="issuer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Otorgado por</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Empresa, institución…"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Mar 2023" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
-                  name="date"
+                  name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fecha</FormLabel>
+                      <FormLabel>Descripción</FormLabel>
                       <FormControl>
-                        <Input placeholder="Mar 2023" {...field} />
+                        <Textarea rows={3} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción</FormLabel>
-                    <FormControl>
-                      <Textarea rows={3} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              </DialogBody>
               <DialogFooter>
                 <Button type="submit">Guardar</Button>
               </DialogFooter>

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, desc, eq, ne } from "drizzle-orm"
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm"
 import { db } from "@/db"
 import { careerMaterial, cv, experience, project } from "@/db/schema"
 import type { CvData } from "@/schemas/cv.schema"
@@ -214,7 +214,11 @@ async function fetchBankItems(userId: string): Promise<CorpusItem[]> {
   const rows = await db
     .select()
     .from(careerMaterial)
-    .where(eq(careerMaterial.userId, userId))
+    // Same reasoning as `cvFilter` below: a deleted bank item must stop
+    // reaching the AI prompt, not just stop rendering in the UI.
+    .where(
+      and(eq(careerMaterial.userId, userId), isNull(careerMaterial.deletedAt)),
+    )
     .orderBy(desc(careerMaterial.createdAt))
   return rows.map(bankItemToCorpusItem)
 }
@@ -235,9 +239,15 @@ async function fetchOtherCvItems(
   userId: string,
   excludeCvId: string | null,
 ): Promise<CorpusItem[]> {
+  // `isNull(cv.deletedAt)` matters more here than anywhere else in the app:
+  // without it a CV the user deleted would keep feeding its experiences,
+  // projects and summary into the AI adaptation prompt. "I deleted it and
+  // the AI still writes about it" is the worst possible way for a soft
+  // delete to leak. Applied once — all three queries below share this
+  // filter, including the two that reach `cv` through an `innerJoin`.
   const cvFilter = excludeCvId
-    ? and(eq(cv.userId, userId), ne(cv.id, excludeCvId))
-    : eq(cv.userId, userId)
+    ? and(eq(cv.userId, userId), isNull(cv.deletedAt), ne(cv.id, excludeCvId))
+    : and(eq(cv.userId, userId), isNull(cv.deletedAt))
 
   const [cvs, experienceRows, projectRows] = await Promise.all([
     db

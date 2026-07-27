@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { ConfirmDeleteButton } from "@/components/ui/confirm-dialog"
 import {
   Select,
   SelectContent,
@@ -115,17 +116,27 @@ export function ProviderSettings({
                     }}
                     onSaved={refresh}
                   />
-                  <Button
-                    type="button"
+                  <ConfirmDeleteButton
                     size="sm"
                     variant="destructive"
                     disabled={busyId === p.id}
-                    onClick={() =>
-                      void run(p.id, () => deleteProviderKey(p.id))
+                    title="¿Eliminar este proveedor?"
+                    description={
+                      <>
+                        Se eliminará la clave de{" "}
+                        <strong>
+                          {PROVIDER_LABELS[p.provider as AiProviderId] ??
+                            p.provider}
+                        </strong>{" "}
+                        junto con sus {p.models.length} modelo
+                        {p.models.length === 1 ? "" : "s"}. Los flujos que la
+                        usen dejarán de funcionar hasta que configures otra.
+                      </>
                     }
+                    onConfirm={() => run(p.id, () => deleteProviderKey(p.id))}
                   >
                     Eliminar
-                  </Button>
+                  </ConfirmDeleteButton>
                 </CardAction>
               </CardHeader>
               <CardContent className="flex flex-col gap-3 text-sm">
@@ -147,8 +158,11 @@ export function ProviderSettings({
                       setDefaultProviderModel(modelRowId),
                     )
                   }
+                  // Returns the promise (rather than `void`-ing it) so the
+                  // confirmation dialog can keep its buttons disabled until
+                  // the action actually resolves.
                   onDelete={(modelRowId) =>
-                    void run(modelRowId, () => deleteProviderModel(modelRowId))
+                    run(modelRowId, () => deleteProviderModel(modelRowId))
                   }
                   onAdded={refresh}
                 />
@@ -171,7 +185,7 @@ function ModelList({
   provider: ProviderKeySummary
   busyId: string | null
   onSetDefault: (modelRowId: string) => void
-  onDelete: (modelRowId: string) => void
+  onDelete: (modelRowId: string) => Promise<void>
   onAdded: () => void
 }) {
   return (
@@ -209,15 +223,24 @@ function ModelList({
                     Usar por defecto
                   </Button>
                 )}
-                <Button
-                  type="button"
+                <ConfirmDeleteButton
                   size="sm"
                   variant="ghost"
                   disabled={busyId === m.id}
-                  onClick={() => onDelete(m.id)}
+                  title="¿Quitar este modelo?"
+                  description={
+                    <>
+                      Se quitará <strong>{m.modelId}</strong> de esta clave. La
+                      clave y el resto de sus modelos no se tocan, y si lo
+                      volvés a registrar más adelante se reactiva el mismo
+                      registro.
+                    </>
+                  }
+                  confirmLabel="Quitar"
+                  onConfirm={() => onDelete(m.id)}
                 >
                   Quitar
-                </Button>
+                </ConfirmDeleteButton>
               </span>
             </li>
           ))}

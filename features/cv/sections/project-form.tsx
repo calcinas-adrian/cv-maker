@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { DialogFooter } from "@/components/ui/dialog"
+import { DialogBody, DialogFooter } from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -68,10 +68,14 @@ export function formValuesToProjectItem(
 /**
  * Presentational form only — deliberately has no `<Dialog>`/`<DialogContent>`
  * wrapper of its own. `ProjectSection` renders it inside its own Dialog;
- * the GitHub-import review step renders it as a step inside ITS dialog
- * (nesting two Radix Dialogs would be its own headache), so the chrome
- * stays the caller's responsibility and only the fields + submit button
- * are shared here.
+ * the GitHub-import review step renders it inside ITS sheet (nesting two
+ * Radix Dialogs would be its own headache), so the shell stays the caller's
+ * responsibility and only the fields + submit button are shared here.
+ *
+ * It DOES own its `DialogBody`/`DialogFooter` pair, so it must be mounted as
+ * a direct child of a dialog or sheet shell — never nested inside another
+ * body, which would stack two scroll containers. Callers that need to show
+ * something above the fields pass it through `notice` rather than wrapping.
  *
  * `submitLabel` default is "Guardar" (Spanish) rather than "Save" — this
  * form has no `<Dialog>`/wrapper of its own, and every current caller
@@ -98,63 +102,66 @@ export function ProjectForm({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-3"
-      >
-        {notice}
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nombre</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL</FormLabel>
-              <FormControl>
-                <Input placeholder="https://…" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Descripción</FormLabel>
-              <FormControl>
-                <Textarea rows={2} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="bulletsText"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Viñetas (una por línea)</FormLabel>
-              <FormControl>
-                <Textarea rows={4} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      {/* `contents` so the form box disappears from layout and `DialogBody` /
+          `DialogFooter` become direct flex children of the dialog (or sheet)
+          shell — the body scrolls, the submit row stays pinned — while the
+          submit button remains inside the form element. */}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+        <DialogBody className="flex flex-col gap-3">
+          {notice}
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="url"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://…" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descripción</FormLabel>
+                <FormControl>
+                  <Textarea rows={2} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="bulletsText"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Viñetas (una por línea)</FormLabel>
+                <FormControl>
+                  <Textarea rows={4} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </DialogBody>
         <DialogFooter>
           <Button type="submit" disabled={submitDisabled}>
             {submitLabel}

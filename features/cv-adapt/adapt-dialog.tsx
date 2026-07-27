@@ -7,14 +7,15 @@ import { Loader2Icon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -260,150 +261,153 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetTrigger asChild>
         <Button type="button" variant="outline" size="sm">
           <SparklesIcon data-icon="inline-start" />
           Adaptar a un aviso
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Adaptar CV a un aviso de trabajo</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent size="lg">
+        <SheetHeader>
+          <SheetTitle>Adaptar CV a un aviso de trabajo</SheetTitle>
+          <SheetDescription>
             Pegá el aviso completo — la IA arma un CV adaptado a partir de tu
             material de carrera, que revisás acá antes de crear nada.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {step.name === "paste" ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="job-posting-text">Aviso de trabajo</Label>
-            <Textarea
-              id="job-posting-text"
-              rows={10}
-              value={postingText}
-              onChange={(e) => setPostingText(e.target.value)}
-              placeholder="Pegá acá la descripción completa del puesto…"
-            />
-            <p className="text-muted-foreground text-xs">
-              {trimmedLength} / {MAX_JOB_POSTING_CHARS}
-            </p>
+          <>
+            <SheetBody className="flex flex-col gap-2">
+              <Label htmlFor="job-posting-text">Aviso de trabajo</Label>
+              <Textarea
+                id="job-posting-text"
+                rows={14}
+                value={postingText}
+                onChange={(e) => setPostingText(e.target.value)}
+                placeholder="Pegá acá la descripción completa del puesto…"
+              />
+              <p className="text-muted-foreground text-xs">
+                {trimmedLength} / {MAX_JOB_POSTING_CHARS}
+              </p>
 
-            {/* Only worth showing when there is an actual choice to make.
-                With a single registered model the selector would be a
-                one-option dropdown that changes nothing. */}
-            {modelOptions.length > 1 && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="adapt-model">Modelo</Label>
-                <Select
-                  value={selectedModelId}
-                  onValueChange={setSelectedModelId}
-                >
-                  <SelectTrigger id="adapt-model">
-                    <SelectValue placeholder="Usar mi modelo por defecto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {modelOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.modelId}
-                        {option.isDefault ? " (por defecto)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs">
-                  Un modelo más liviano responde antes; uno más pesado suele
-                  adaptar mejor.
-                </p>
-              </div>
-            )}
-
-            <DialogFooter>
+              {/* Only worth showing when there is an actual choice to make.
+                  With a single registered model the selector would be a
+                  one-option dropdown that changes nothing. */}
+              {modelOptions.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="adapt-model">Modelo</Label>
+                  <Select
+                    value={selectedModelId}
+                    onValueChange={setSelectedModelId}
+                  >
+                    <SelectTrigger id="adapt-model">
+                      <SelectValue placeholder="Usar mi modelo por defecto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.modelId}
+                          {option.isDefault ? " (por defecto)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    Un modelo más liviano responde antes; uno más pesado suele
+                    adaptar mejor.
+                  </p>
+                </div>
+              )}
+            </SheetBody>
+            <SheetFooter>
               <Button type="button" disabled={!canAdapt} onClick={handleAdapt}>
                 Adaptar
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         ) : step.name === "adapting" ? (
-          <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+          <SheetBody className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2Icon className="size-4 animate-spin" />
             Adaptando tu CV al aviso…
-          </div>
+          </SheetBody>
         ) : step.name === "review" ? (
-          <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="adapt-title">Título</Label>
-                <Input
-                  id="adapt-title"
-                  value={step.title}
-                  onChange={(e) => updateField({ title: e.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="adapt-summary">Resumen</Label>
-                <Textarea
-                  id="adapt-summary"
-                  rows={4}
-                  value={step.summary}
-                  onChange={(e) => updateField({ summary: e.target.value })}
-                />
-              </div>
-              {step.adaptationNotes ? (
-                <div className="bg-muted/50 text-muted-foreground rounded-lg border p-2.5 text-xs">
-                  {step.adaptationNotes}
+          <>
+            <SheetBody className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="adapt-title">Título</Label>
+                  <Input
+                    id="adapt-title"
+                    value={step.title}
+                    onChange={(e) => updateField({ title: e.target.value })}
+                  />
                 </div>
-              ) : null}
-              <p className="text-muted-foreground text-xs">
-                Material de referencia: {step.corpus.includedCount} de{" "}
-                {step.corpus.totalCount} ítems
-                {step.corpus.capReached
-                  ? " — Se alcanzó el límite de material; el CV de origen siempre se incluye completo."
-                  : ""}
-              </p>
-            </div>
-
-            {(
-              [
-                ["experiences", "Experiencia"],
-                ["projects", "Proyectos"],
-                ["education", "Educación"],
-                ["skills", "Habilidades"],
-              ] as const
-            ).map(([section, label]) => {
-              const items = step[section]
-              if (items.length === 0) return null
-              return (
-                <div key={section} className="flex flex-col gap-2">
-                  <p className="text-sm font-medium">
-                    {label}{" "}
-                    <span className="text-muted-foreground font-normal">
-                      ({items.filter((i) => i.included).length}/{items.length})
-                    </span>
-                  </p>
-                  <div className="flex flex-col gap-1.5">
-                    {items.map((item) => {
-                      const { title, subtitle } = describeItem(
-                        section,
-                        item.data,
-                      )
-                      return (
-                        <ReviewItemRow
-                          key={item.id}
-                          title={title}
-                          subtitle={subtitle}
-                          included={item.included}
-                          onToggle={() => toggleItem(section, item.id)}
-                        />
-                      )
-                    })}
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="adapt-summary">Resumen</Label>
+                  <Textarea
+                    id="adapt-summary"
+                    rows={4}
+                    value={step.summary}
+                    onChange={(e) => updateField({ summary: e.target.value })}
+                  />
+                </div>
+                {step.adaptationNotes ? (
+                  <div className="bg-muted/50 text-muted-foreground rounded-lg border p-2.5 text-xs">
+                    {step.adaptationNotes}
                   </div>
-                </div>
-              )
-            })}
+                ) : null}
+                <p className="text-muted-foreground text-xs">
+                  Material de referencia: {step.corpus.includedCount} de{" "}
+                  {step.corpus.totalCount} ítems
+                  {step.corpus.capReached
+                    ? " — Se alcanzó el límite de material; el CV de origen siempre se incluye completo."
+                    : ""}
+                </p>
+              </div>
 
-            <DialogFooter>
+              {(
+                [
+                  ["experiences", "Experiencia"],
+                  ["projects", "Proyectos"],
+                  ["education", "Educación"],
+                  ["skills", "Habilidades"],
+                ] as const
+              ).map(([section, label]) => {
+                const items = step[section]
+                if (items.length === 0) return null
+                return (
+                  <div key={section} className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">
+                      {label}{" "}
+                      <span className="text-muted-foreground font-normal">
+                        ({items.filter((i) => i.included).length}/{items.length}
+                        )
+                      </span>
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {items.map((item) => {
+                        const { title, subtitle } = describeItem(
+                          section,
+                          item.data,
+                        )
+                        return (
+                          <ReviewItemRow
+                            key={item.id}
+                            title={title}
+                            subtitle={subtitle}
+                            included={item.included}
+                            onToggle={() => toggleItem(section, item.id)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </SheetBody>
+            <SheetFooter>
               <Button
                 type="button"
                 disabled={isConfirming}
@@ -411,21 +415,23 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
               >
                 {isConfirming ? "Creando…" : "Crear CV"}
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         ) : (
-          <div className="flex flex-col gap-3">
-            {step.code === "provider_not_configured" ? (
-              <p className="text-sm">
-                {step.message}{" "}
-                <Link href="/settings" className="underline">
-                  Ir a Ajustes
-                </Link>
-              </p>
-            ) : (
-              <p className="text-destructive text-sm">{step.message}</p>
-            )}
-            <DialogFooter>
+          <>
+            <SheetBody className="flex flex-col gap-3">
+              {step.code === "provider_not_configured" ? (
+                <p className="text-sm">
+                  {step.message}{" "}
+                  <Link href="/settings" className="underline">
+                    Ir a Ajustes
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-destructive text-sm">{step.message}</p>
+              )}
+            </SheetBody>
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -433,11 +439,11 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
               >
                 Volver
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 

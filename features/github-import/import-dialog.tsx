@@ -7,14 +7,15 @@ import { GitBranchIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -240,25 +241,29 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetTrigger asChild>
         <Button type="button" size="sm" variant="outline">
           <GitBranchIcon /> Importar de GitHub
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Importar de GitHub</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent size="lg">
+        <SheetHeader>
+          <SheetTitle>Importar de GitHub</SheetTitle>
+          <SheetDescription>
             Elegí un repo — la IA arma un borrador que podés editar antes de
             agregarlo al CV, como proyecto o como experiencia.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {connectionQuery.isPending ? (
-          <p className="text-muted-foreground text-sm">Verificando conexión…</p>
+          <SheetBody>
+            <p className="text-muted-foreground text-sm">
+              Verificando conexión…
+            </p>
+          </SheetBody>
         ) : connectionStatus !== "ready" ? (
-          <div className="flex flex-col gap-3">
+          <SheetBody className="flex flex-col gap-3">
             <p className="text-muted-foreground text-sm">
               {connectionStatus === "missing_scope"
                 ? "Tu cuenta de GitHub está conectada pero sin permiso para leer tus repos."
@@ -269,9 +274,9 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
                 ? "Reconectar GitHub"
                 : "Conectar GitHub"}
             </ConnectGithubButton>
-          </div>
+          </SheetBody>
         ) : step.name === "list" ? (
-          <div className="flex flex-col gap-4">
+          <SheetBody className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="github-import-target">Agregar como</Label>
@@ -322,59 +327,61 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
               query={reposQuery}
               onSelect={handleExtract}
             />
-          </div>
+          </SheetBody>
         ) : step.name === "extracting" ? (
-          <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+          <SheetBody className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2Icon className="size-4 animate-spin" />
             {step.mode === "full_code"
               ? `Descargando y analizando el código de ${step.repo.fullName}… puede tardar más que un análisis de solo README.`
               : `Extrayendo información de ${step.repo.fullName}…`}
-          </div>
+          </SheetBody>
         ) : step.name === "review" ? (
-          <div className="flex flex-col gap-3">
-            {!step.hadReadme && (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
-                Este repo no tiene README — revisá y completá la descripción
-                antes de agregarlo.
-              </p>
-            )}
-            {step.codeDigestWarning && (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
-                No se pudo analizar el código completo — este borrador se armó
-                solo con metadata y README. ({step.codeDigestWarning})
-              </p>
-            )}
-            {step.target === "project" ? (
-              <ProjectForm
-                defaultValues={step.draft}
-                submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
-                submitDisabled={isApplying}
-                onSubmit={(values) => handleConfirmProject(values, step.repo)}
-              />
-            ) : (
-              <ExperienceForm
-                defaultValues={step.draft}
-                submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
-                submitDisabled={isApplying}
-                onSubmit={(values) =>
-                  handleConfirmExperience(values, step.repo)
-                }
-              />
-            )}
-          </div>
+          // The forms render their own `SheetBody`-equivalent body and pinned
+          // footer, so they are mounted directly against the sheet shell —
+          // wrapping them in another body would nest two scroll containers and
+          // bury the submit row. Warnings ride along via the `notice` slot.
+          step.target === "project" ? (
+            <ProjectForm
+              defaultValues={step.draft}
+              notice={
+                <ImportNotices
+                  hadReadme={step.hadReadme}
+                  codeDigestWarning={step.codeDigestWarning}
+                />
+              }
+              submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
+              submitDisabled={isApplying}
+              onSubmit={(values) => handleConfirmProject(values, step.repo)}
+            />
+          ) : (
+            <ExperienceForm
+              defaultValues={step.draft}
+              notice={
+                <ImportNotices
+                  hadReadme={step.hadReadme}
+                  codeDigestWarning={step.codeDigestWarning}
+                />
+              }
+              submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
+              submitDisabled={isApplying}
+              onSubmit={(values) => handleConfirmExperience(values, step.repo)}
+            />
+          )
         ) : (
-          <div className="flex flex-col gap-3">
-            {step.code === "provider_not_configured" ? (
-              <p className="text-sm">
-                {step.message}{" "}
-                <Link href="/settings" className="underline">
-                  Ir a Ajustes
-                </Link>
-              </p>
-            ) : (
-              <p className="text-destructive text-sm">{step.message}</p>
-            )}
-            <DialogFooter>
+          <>
+            <SheetBody className="flex flex-col gap-3">
+              {step.code === "provider_not_configured" ? (
+                <p className="text-sm">
+                  {step.message}{" "}
+                  <Link href="/settings" className="underline">
+                    Ir a Ajustes
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-destructive text-sm">{step.message}</p>
+              )}
+            </SheetBody>
+            <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -382,10 +389,37 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
               >
                 Volver
               </Button>
-            </DialogFooter>
-          </div>
+            </SheetFooter>
+          </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function ImportNotices({
+  hadReadme,
+  codeDigestWarning,
+}: {
+  hadReadme: boolean
+  codeDigestWarning: string | null
+}) {
+  if (hadReadme && !codeDigestWarning) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      {!hadReadme && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+          Este repo no tiene README — revisá y completá la descripción antes de
+          agregarlo.
+        </p>
+      )}
+      {codeDigestWarning && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+          No se pudo analizar el código completo — este borrador se armó solo
+          con metadata y README. ({codeDigestWarning})
+        </p>
+      )}
+    </div>
   )
 }

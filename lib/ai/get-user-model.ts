@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, isNull, sql } from "drizzle-orm"
 import type { LanguageModel } from "ai"
 import { db } from "@/db"
 import { aiProviderKey, aiProviderModel } from "@/db/schema"
@@ -77,7 +77,17 @@ export async function getConfiguredModelForUser(
       aiProviderKey,
       eq(aiProviderModel.providerKeyId, aiProviderKey.id),
     )
-    .where(eq(aiProviderKey.userId, userId))
+    // Soft-deleted models (and models under a soft-deleted credential) must
+    // never be resolvable: this is the path with NO user-facing picker, so a
+    // deleted model silently becoming the fallback default would be
+    // invisible until an import ran against a provider the user removed.
+    .where(
+      and(
+        eq(aiProviderKey.userId, userId),
+        isNull(aiProviderModel.deletedAt),
+        isNull(aiProviderKey.deletedAt),
+      ),
+    )
     .orderBy(
       desc(aiProviderModel.isDefault),
       sql`${aiProviderKey.lastValidatedAt} desc nulls last`,
@@ -169,7 +179,13 @@ export async function listUserModelOptions(
       aiProviderKey,
       eq(aiProviderModel.providerKeyId, aiProviderKey.id),
     )
-    .where(eq(aiProviderKey.userId, userId))
+    .where(
+      and(
+        eq(aiProviderKey.userId, userId),
+        isNull(aiProviderModel.deletedAt),
+        isNull(aiProviderKey.deletedAt),
+      ),
+    )
     .orderBy(
       desc(aiProviderModel.isDefault),
       desc(aiProviderKey.createdAt),
@@ -185,6 +201,13 @@ export async function listUserModelOptions(
  *
  * Expressed as a subquery over the user's credentials because
  * `ai_provider_model` has no `userId` of its own.
+ *
+ * Deliberately NOT filtered by `deleted_at` — on either table. This is the
+ * one query in the file that should reach soft-deleted rows, and
+ * `deleteProviderModel` depends on it: clearing the flag everywhere means a
+ * dead row can never hold a stale `isDefault` that would resurrect as a
+ * second default when the model is revived. Adding an `isNull` here would
+ * silently break that invariant.
  */
 export function clearDefaultModelQuery(userId: string) {
   return db

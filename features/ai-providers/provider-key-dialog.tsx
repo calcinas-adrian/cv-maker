@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -130,7 +131,7 @@ export function ProviderKeyDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Editar proveedor" : "Agregar proveedor"}
@@ -143,57 +144,86 @@ export function ProviderKeyDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-4"
-          >
-            {/* Explicitly registered (rather than relying on an
+          <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+            <DialogBody className="flex flex-col gap-4">
+              {/* Explicitly registered (rather than relying on an
                 unrendered defaultValues key) so the row id reliably
                 round-trips into `onSubmit` for the edit case. */}
-            <input type="hidden" {...form.register("id")} />
+              <input type="hidden" {...form.register("id")} />
 
-            <FormField
-              control={form.control}
-              name="provider"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Proveedor</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      form.setValue("modelId", "")
-                    }}
-                    disabled={!!editing}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {AI_PROVIDERS.map((id) => (
-                        <SelectItem key={id} value={id}>
-                          {PROVIDER_LABELS[id]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {provider === "compatible" && (
               <FormField
                 control={form.control}
-                name="baseURL"
+                name="provider"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Base URL</FormLabel>
+                    <FormLabel>Proveedor</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value)
+                        form.setValue("modelId", "")
+                      }}
+                      disabled={!!editing}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {AI_PROVIDERS.map((id) => (
+                          <SelectItem key={id} value={id}>
+                            {PROVIDER_LABELS[id]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {provider === "compatible" && (
+                <FormField
+                  control={form.control}
+                  name="baseURL"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Base URL</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://api.ejemplo.com/v1"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="apiKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      API key
+                      {editing ? (
+                        <span className="text-muted-foreground font-normal">
+                          {" "}
+                          — opcional
+                        </span>
+                      ) : null}
+                    </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://api.ejemplo.com/v1"
+                        type="password"
+                        autoComplete="off"
+                        placeholder={
+                          editing ? "Dejala vacía para no cambiarla" : ""
+                        }
                         {...field}
                         value={field.value ?? ""}
                       />
@@ -202,70 +232,44 @@ export function ProviderKeyDialog({
                   </FormItem>
                 )}
               />
-            )}
 
-            <FormField
-              control={form.control}
-              name="apiKey"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    API key
-                    {editing ? (
-                      <span className="text-muted-foreground font-normal">
-                        {" "}
-                        — opcional
-                      </span>
-                    ) : null}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      autoComplete="off"
-                      placeholder={
-                        editing ? "Dejala vacía para no cambiarla" : ""
-                      }
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="modelId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Modelo</FormLabel>
-                  {provider === "compatible" ? (
-                    <FormControl>
-                      <Input placeholder="id del modelo" {...field} />
-                    </FormControl>
-                  ) : (
-                    <Select value={field.value} onValueChange={field.onChange}>
+              <FormField
+                control={form.control}
+                name="modelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modelo</FormLabel>
+                    {provider === "compatible" ? (
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Elegí un modelo" />
-                        </SelectTrigger>
+                        <Input placeholder="id del modelo" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {catalog.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.label}
-                            {!model.recommendedForExtraction ? " (básico)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+                    ) : (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Elegí un modelo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {catalog.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              {model.label}
+                              {!model.recommendedForExtraction
+                                ? " (básico)"
+                                : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </DialogBody>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Validando…" : "Guardar"}

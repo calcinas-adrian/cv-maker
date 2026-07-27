@@ -107,7 +107,7 @@ export function ProjectSection({ cvId }: { cvId: string }) {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar proyecto" : "Agregar proyecto"}
