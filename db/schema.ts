@@ -241,6 +241,14 @@ export const cvVersion = pgTable("cv_version", {
  * posting. No `userId`: reached via `cv.userId`, same satellite pattern as
  * `cv_version`. `sourceCvId` is `set null` (not cascade) so deleting the
  * CV an adaptation was derived FROM never deletes the adapted CV itself.
+ *
+ * `adaptationNotes` lives HERE rather than in a satellite table of its own.
+ * It is a single-valued attribute of the adaptation event, functionally
+ * dependent on this row's whole primary key and on nothing else — that is
+ * already 3NF. A 1:1 side table would add a join and a possible orphan row
+ * while removing no redundancy, which is the opposite of what normalising
+ * is for. Nullable because every row written before this column existed
+ * genuinely has no notes; "unknown" is the honest value, not `''`.
  */
 export const cvAdaptation = pgTable("cv_adaptation", {
   id: text("id").primaryKey(),
@@ -251,6 +259,7 @@ export const cvAdaptation = pgTable("cv_adaptation", {
     onDelete: "set null",
   }),
   jobPostingText: text("job_posting_text").notNull(),
+  adaptationNotes: text("adaptation_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 

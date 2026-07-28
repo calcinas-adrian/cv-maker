@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Loader2Icon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { AiRunPreflight } from "@/components/ai-run-preflight"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -61,6 +63,10 @@ type ReviewState = {
 
 type Step =
   | { name: "paste" }
+  // Between pasting and spending. The posting text itself lives in
+  // `postingText` (outside `step`), so this carries no payload — it is
+  // purely the beat where the user reads back what is about to run.
+  | { name: "confirm" }
   | { name: "adapting" }
   | ({ name: "review" } & ReviewState)
   | { name: "error"; message: string; code: ResultErrorCode }
@@ -170,6 +176,47 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
     trimmedLength >= MIN_JOB_POSTING_CHARS &&
     trimmedLength <= MAX_JOB_POSTING_CHARS
 
+  /**
+   * The length rule, said out loud on every keystroke.
+   *
+   * The rule itself stays — a 20-character "posting" would burn a paid call
+   * on nothing. What changes is that it used to be enforced ONLY by a dead
+   * disabled button, which tells the user they are blocked without ever
+   * telling them by how much or why. A limit the user can watch themselves
+   * satisfy is guidance; the same limit enforced silently is just a broken
+   * button.
+   */
+  const lengthHint = (() => {
+    if (trimmedLength === 0) {
+      return { tone: "muted" as const, text: "Pegá el aviso para empezar." }
+    }
+    if (trimmedLength < MIN_JOB_POSTING_CHARS) {
+      const missing = MIN_JOB_POSTING_CHARS - trimmedLength
+      return {
+        tone: "muted" as const,
+        text: `${trimmedLength} caracteres — faltan ${missing} para poder adaptar.`,
+      }
+    }
+    if (trimmedLength > MAX_JOB_POSTING_CHARS) {
+      const excess = trimmedLength - MAX_JOB_POSTING_CHARS
+      return {
+        tone: "error" as const,
+        text: `${trimmedLength} caracteres — te pasaste por ${excess}. Dejá solo la descripción del puesto y los requisitos.`,
+      }
+    }
+    return {
+      tone: "muted" as const,
+      text: `${trimmedLength} de ${MAX_JOB_POSTING_CHARS} caracteres.`,
+    }
+  })()
+
+  // What the confirm step and the run button actually name. `selectedModelId`
+  // is `""` for "use my default", which resolves server-side.
+  const selectedModelLabel =
+    modelOptions.find((option) => option.id === selectedModelId)?.modelId ??
+    modelOptions.find((option) => option.isDefault)?.modelId ??
+    null
+
   async function handleAdapt() {
     setStep({ name: "adapting" })
 
@@ -227,6 +274,11 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
       sourceCvId: cvId,
       title: step.title,
       jobPostingText: postingText,
+      // Sent verbatim as the model produced them, NOT as the user may have
+      // seen them edited — the notes are a record of what the model claimed
+      // it did, so they are only worth keeping unaltered. That is also why
+      // there is no input for them in the review UI above.
+      adaptationNotes: step.adaptationNotes,
       draft,
     })
 
@@ -288,8 +340,16 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
                 onChange={(e) => setPostingText(e.target.value)}
                 placeholder="Pegá acá la descripción completa del puesto…"
               />
-              <p className="text-muted-foreground text-xs">
-                {trimmedLength} / {MAX_JOB_POSTING_CHARS}
+              <p
+                aria-live="polite"
+                className={cn(
+                  "text-xs",
+                  lengthHint.tone === "error"
+                    ? "text-destructive"
+                    : "text-muted-foreground",
+                )}
+              >
+                {lengthHint.text}
               </p>
 
               {/* Only worth showing when there is an actual choice to make.
@@ -322,8 +382,46 @@ export function AdaptCvDialog({ cvId }: { cvId: string }) {
               )}
             </SheetBody>
             <SheetFooter>
-              <Button type="button" disabled={!canAdapt} onClick={handleAdapt}>
-                Adaptar
+              <Button
+                type="button"
+                disabled={!canAdapt}
+                onClick={() => setStep({ name: "confirm" })}
+              >
+                Continuar
+              </Button>
+            </SheetFooter>
+          </>
+        ) : step.name === "confirm" ? (
+          <>
+            <SheetBody>
+              <AiRunPreflight
+                rows={[
+                  {
+                    label: "Aviso",
+                    value: `${trimmedLength} caracteres pegados`,
+                  },
+                  {
+                    label: "Modelo",
+                    value: selectedModelLabel ?? "Tu modelo por defecto",
+                  },
+                  {
+                    label: "Material",
+                    value:
+                      "Este CV completo, más tu banco de material de carrera",
+                  },
+                ]}
+              />
+            </SheetBody>
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep({ name: "paste" })}
+              >
+                Volver al aviso
+              </Button>
+              <Button type="button" onClick={handleAdapt}>
+                Adaptar el CV
               </Button>
             </SheetFooter>
           </>

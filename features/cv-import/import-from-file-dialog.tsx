@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Loader2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
+import { AiRunPreflight } from "@/components/ai-run-preflight"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -27,8 +28,14 @@ import type {
   ProjectExtractItem,
   SkillExtract,
 } from "@/schemas/cv-import.schema"
+import { listModelOptions } from "@/features/ai-providers/actions"
 import { createCvFromImport, extractCvFromFile } from "./actions"
-import { ACCEPTED_EXTENSIONS } from "./constants"
+import {
+  ACCEPTED_EXTENSIONS,
+  FILE_TOO_LARGE_ERROR,
+  MAX_FILE_SIZE_BYTES,
+  UNSUPPORTED_FILE_TYPE_ERROR,
+} from "./constants"
 import { ReviewItemRow } from "./review-item-row"
 
 type BasicInfo = {
@@ -52,9 +59,22 @@ type ReviewState = {
 
 type Step =
   | { name: "pick" }
+  // Picking a file no longer starts anything. It lands HERE, where the user
+  // can read back which file they actually chose and drop it — a paid,
+  // unstoppable call must never be one misclick away in a file browser.
+  // Carries no payload: the file itself lives in `pickedFile`, so the error
+  // step can come back to this one without it.
+  | { name: "confirm" }
   | { name: "extracting"; fileName: string }
   | ({ name: "review" } & ReviewState)
   | { name: "error"; message: string; code: ResultErrorCode }
+
+/** e.g. `2,4 MB` — sized for a human deciding "is this the right file". */
+function formatFileSize(bytes: number): string {
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1) return `${mb.toFixed(1).replace(".", ",")} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
 
 function toChecked<T>(items: T[]): Checked<T>[] {
   return items.map((data) => ({
@@ -130,24 +150,71 @@ export function ImportFromFileDialog() {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<Step>({ name: "pick" })
   const [isCreating, setIsCreating] = useState(false)
+  // Lives OUTSIDE `step` for the same reason `adapt-dialog.tsx` keeps the
+  // posting text outside its own: so `error -> "Volver"` can land back on
+  // the confirm step with the file still selected. Re-opening the OS file
+  // browser to re-find the same CV after a transient 429 is exactly the
+  // kind of friction this whole flow is meant to remove. Reset only on
+  // close.
+  const [pickedFile, setPickedFile] = useState<File | null>(null)
+  // Only ever displayed — `extractCvFromFile` resolves the user's default
+  // model server-side and takes no model argument. Shown anyway because
+  // "which model is about to spend my tokens" is precisely the kind of fact
+  // the user cannot see from the file picker.
+  const [defaultModelLabel, setDefaultModelLabel] = useState<string | null>(
+    null,
+  )
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
-      // Reset so reopening the dialog never resumes mid-review of a stale
-      // draft (or a stale error) from a previous open — same reset
-      // discipline as `features/github-import/import-dialog.tsx`.
-      setStep({ name: "pick" })
+    if (next) {
+      // Fetched on open rather than on mount: this dialog's trigger renders
+      // on `/dashboard` for everyone, and most visits never open it.
+      void listModelOptions().then((result) => {
+        if (!result.ok) return
+        const fallback = result.data[0]
+        setDefaultModelLabel(
+          (result.data.find((option) => option.isDefault) ?? fallback)
+            ?.modelId ?? null,
+        )
+      })
+      return
     }
+    // Reset so reopening the dialog never resumes mid-review of a stale
+    // draft (or a stale error) from a previous open — same reset
+    // discipline as `features/github-import/import-dialog.tsx`.
+    setStep({ name: "pick" })
+    setPickedFile(null)
   }
 
-  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     // Clear the input value so picking the exact same file again later
     // still fires `onChange`.
     e.target.value = ""
     if (!file) return
 
+    // Validated HERE as well as on the server. The server checks are the
+    // real guard and stay; these exist so a wrong file is rejected on the
+    // same frame it is picked, instead of after a round trip that looks
+    // like the import already started.
+    const hasAcceptedExtension = ACCEPTED_EXTENSIONS.some((extension) =>
+      file.name.toLowerCase().endsWith(extension),
+    )
+    if (!hasAcceptedExtension) {
+      toast.error(UNSUPPORTED_FILE_TYPE_ERROR)
+      return
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(FILE_TOO_LARGE_ERROR)
+      return
+    }
+
+    setPickedFile(file)
+    setStep({ name: "confirm" })
+  }
+
+  async function handleExtract(file: File) {
     setStep({ name: "extracting", fileName: file.name })
 
     const formData = new FormData()
@@ -241,7 +308,55 @@ export function ImportFromFileDialog() {
               onChange={handleFileChange}
               className="file:bg-secondary file:text-secondary-foreground text-muted-foreground text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
+            <p className="text-muted-foreground text-xs">
+              Vas a poder revisar el archivo antes de que se procese.
+            </p>
           </SheetBody>
+        ) : step.name === "confirm" ? (
+          // `pickedFile` is always set on the way in; the null branch only
+          // exists so this step degrades to "pick again" instead of to a
+          // blank sheet if that ever stops being true.
+          !pickedFile ? (
+            <SheetBody>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep({ name: "pick" })}
+              >
+                Elegir un archivo
+              </Button>
+            </SheetBody>
+          ) : (
+            <>
+              <SheetBody>
+                <AiRunPreflight
+                  rows={[
+                    { label: "Archivo", value: pickedFile.name },
+                    { label: "Tamaño", value: formatFileSize(pickedFile.size) },
+                    {
+                      label: "Modelo",
+                      value: defaultModelLabel ?? "Tu modelo por defecto",
+                    },
+                  ]}
+                />
+              </SheetBody>
+              <SheetFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPickedFile(null)
+                    setStep({ name: "pick" })
+                  }}
+                >
+                  Elegir otro archivo
+                </Button>
+                <Button type="button" onClick={() => handleExtract(pickedFile)}>
+                  Leer este archivo
+                </Button>
+              </SheetFooter>
+            </>
+          )
         ) : step.name === "extracting" ? (
           <SheetBody className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2Icon className="size-4 animate-spin" />
@@ -380,9 +495,15 @@ export function ImportFromFileDialog() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setStep({ name: "pick" })}
+                // Back to the confirm step, not to the file picker: the file
+                // is still in hand, so a transient provider error costs one
+                // click to retry instead of a trip through the OS file
+                // browser to find the same CV again.
+                onClick={() =>
+                  setStep(pickedFile ? { name: "confirm" } : { name: "pick" })
+                }
               >
-                Volver
+                {pickedFile ? "Volver a intentar" : "Volver"}
               </Button>
             </SheetFooter>
           </>

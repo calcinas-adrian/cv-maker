@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { GitBranchIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
+import { AiRunPreflight } from "@/components/ai-run-preflight"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -50,6 +51,11 @@ import type { RepoSummary } from "./octokit"
 
 type Step =
   | { name: "list" }
+  // Selecting a repo used to fire the extraction on the click itself. In a
+  // scrollable list of repos that is one stray click away from the most
+  // expensive call in the app — `full_code` is the default depth — and the
+  // call cannot be stopped once it starts. It lands here instead.
+  | { name: "confirm"; repo: RepoSummary }
   | { name: "extracting"; repo: RepoSummary; mode: GithubImportDepth }
   | {
       name: "review"
@@ -325,9 +331,51 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
               includeForks={includeForks}
               onIncludeForksChange={setIncludeForks}
               query={reposQuery}
-              onSelect={handleExtract}
+              onSelect={(repo) => setStep({ name: "confirm", repo })}
             />
           </SheetBody>
+        ) : step.name === "confirm" ? (
+          <>
+            <SheetBody>
+              <AiRunPreflight
+                rows={[
+                  { label: "Repo", value: step.repo.fullName },
+                  {
+                    label: "Agregar como",
+                    value: target === "project" ? "Proyecto" : "Experiencia",
+                  },
+                  {
+                    label: "Analizar",
+                    value:
+                      mode === "full_code"
+                        ? "Código completo"
+                        : "Solo el README",
+                  },
+                ]}
+              >
+                {mode === "full_code" && (
+                  <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+                    El análisis de código completo descarga el repo y usa
+                    bastantes más tokens que el de solo README. Si solo querés
+                    una descripción rápida, volvé y cambiá
+                    &ldquo;Analizar&rdquo;.
+                  </p>
+                )}
+              </AiRunPreflight>
+            </SheetBody>
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep({ name: "list" })}
+              >
+                Elegir otro repo
+              </Button>
+              <Button type="button" onClick={() => handleExtract(step.repo)}>
+                Analizar {step.repo.name}
+              </Button>
+            </SheetFooter>
+          </>
         ) : step.name === "extracting" ? (
           <SheetBody className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2Icon className="size-4 animate-spin" />

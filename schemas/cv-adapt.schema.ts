@@ -67,6 +67,16 @@ export const cvAdaptReviewSchema = z.object({
   sourceCvId: z.string().min(1),
   title: z.string(),
   jobPostingText: z.string(),
+  // Carried through review so it can be PERSISTED alongside the posting:
+  // these notes say what the model prioritised and — more valuable — which
+  // requirements it could NOT cover with the person's material. That is the
+  // single most useful thing to reread months later when the same company
+  // reappears, and before this field existed it lived only in the review
+  // dialog's local state and died the moment the sheet closed. No `.max()`
+  // here on purpose: the cap is applied by truncation in the action (see
+  // `MAX_ADAPTATION_NOTES_CHARS`), because rejecting the payload would throw
+  // away the whole reviewed CV over a footnote.
+  adaptationNotes: z.string(),
   draft: cvDraftSchema,
 })
 

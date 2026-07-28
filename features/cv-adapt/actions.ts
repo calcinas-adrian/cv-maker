@@ -1,7 +1,7 @@
 "use server"
 
 import { APICallError } from "ai"
-import { eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { createId } from "@paralleldrive/cuid2"
 import type { BatchItem } from "drizzle-orm/batch"
 import { db } from "@/db"
@@ -28,6 +28,7 @@ import {
 import { adaptCvForJobPosting } from "./ai-extract"
 import {
   DEFAULT_ADAPTED_CV_TITLE,
+  MAX_ADAPTATION_NOTES_CHARS,
   JOB_POSTING_TOO_LONG_ERROR,
   JOB_POSTING_TOO_SHORT_ERROR,
   MAX_JOB_POSTING_CHARS,
@@ -168,7 +169,8 @@ export async function createCvFromAdaptation(
     }
   }
 
-  const { sourceCvId, title, jobPostingText, draft } = parsed.data
+  const { sourceCvId, title, jobPostingText, adaptationNotes, draft } =
+    parsed.data
 
   // Same caps as the extract path: `jobPostingText` is client-owned data on
   // BOTH calls, so an oversized blob must not reach the DB by skipping the
@@ -276,10 +278,58 @@ export async function createCvFromAdaptation(
       cvId: id,
       sourceCvId,
       jobPostingText: posting,
+      // Truncated, never rejected — see `MAX_ADAPTATION_NOTES_CHARS`. Empty
+      // notes are stored as NULL rather than `''`: the column means "what
+      // the model explained about this adaptation", and having nothing to
+      // say is genuinely the absence of a value.
+      adaptationNotes:
+        adaptationNotes.trim().slice(0, MAX_ADAPTATION_NOTES_CHARS) || null,
     }),
   ]
 
   await db.batch(queries as [BatchItem<"pg">, ...BatchItem<"pg">[]])
 
   return { ok: true, data: { id } }
+}
+
+/**
+ * Fetches ONE stored job posting in full, for the application-history page's
+ * expand affordance.
+ *
+ * Exists so `listUserAdaptations` can ship a short preview instead of every
+ * posting in full: at 12k characters each, a person with fifty adaptations
+ * would otherwise download most of a megabyte of text to read the handful of
+ * lines the page actually renders. The trade is one round trip per expand,
+ * paid only by the rows someone opens.
+ *
+ * `adaptationId` comes from the client and is never trusted alone — the join
+ * to `cv` scopes the row to the session's own, still-live CVs, so an id
+ * belonging to somebody else resolves to nothing rather than to their
+ * posting. Same rule `findOwnedCv` enforces for CVs; `cv_adaptation` has no
+ * `userId` of its own to check directly.
+ */
+export async function getAdaptationPosting(
+  adaptationId: string,
+): Promise<Result<{ jobPostingText: string }>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const [row] = await db
+    .select({ jobPostingText: cvAdaptation.jobPostingText })
+    .from(cvAdaptation)
+    .innerJoin(
+      cv,
+      and(
+        eq(cv.id, cvAdaptation.cvId),
+        eq(cv.userId, userId),
+        isNull(cv.deletedAt),
+      ),
+    )
+    .where(eq(cvAdaptation.id, adaptationId))
+    .limit(1)
+
+  if (!row) return { ok: false, error: "No encontrado", code: "not_found" }
+
+  return { ok: true, data: { jobPostingText: row.jobPostingText } }
 }
