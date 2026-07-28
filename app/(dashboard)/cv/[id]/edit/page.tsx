@@ -201,6 +201,7 @@ export default async function EditCvPage({
       initialData={initialData}
       initialUpdatedAt={cvRow.updatedAt.toISOString()}
       initialTheme={cvRow.theme ?? DEFAULT_THEME}
+      initialTitle={cvRow.title}
     />
   )
 }

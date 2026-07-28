@@ -30,9 +30,18 @@ export type PreflightRow = {
 export function AiRunPreflight({
   rows,
   children,
+  disclaimer,
 }: {
   rows: PreflightRow[]
   children?: ReactNode
+  /**
+   * Replaces the default "consume una llamada a tu proveedor" paragraph
+   * wholesale. Added for `TranslateCvDialog`, which can run entirely
+   * on-device and needs to say so — the default stays the fallback for the
+   * three existing call sites (`AdaptCvDialog`, both import dialogs), which
+   * pass nothing and are unaffected.
+   */
+  disclaimer?: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -47,10 +56,12 @@ export function AiRunPreflight({
         ))}
       </dl>
       {children}
-      <p className="text-muted-foreground text-xs">
-        Esto consume una llamada a tu proveedor de IA. Una vez que empieza no se
-        puede cancelar.
-      </p>
+      {disclaimer ?? (
+        <p className="text-muted-foreground text-xs">
+          Esto consume una llamada a tu proveedor de IA. Una vez que empieza no
+          se puede cancelar.
+        </p>
+      )}
     </div>
   )
 }

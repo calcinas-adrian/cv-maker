@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Download, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AdaptCvDialog } from "@/features/cv-adapt/adapt-dialog"
+import { TranslateCvDialog } from "@/features/cv-translate/translate-dialog"
 import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { AutosaveIndicator } from "./autosave-indicator"
 import { CvEditorSkeleton } from "./cv-editor-skeleton"
@@ -46,11 +47,13 @@ export function CvEditor({
   initialData,
   initialUpdatedAt,
   initialTheme,
+  initialTitle,
 }: {
   cvId: string
   initialData: CvData
   initialUpdatedAt: string
   initialTheme: CvTheme
+  initialTitle: string
 }) {
   const hydrate = useEditorStore((s) => s.hydrate)
   const setTheme = useEditorStore((s) => s.setTheme)
@@ -116,6 +119,7 @@ export function CvEditor({
             </a>
           </Button>
           <AdaptCvDialog cvId={cvId} />
+          <TranslateCvDialog cvId={cvId} title={initialTitle} />
         </div>
       </div>
 
