@@ -1,1 +1,0 @@
-ALTER TABLE "cv" ADD COLUMN "theme" jsonb;

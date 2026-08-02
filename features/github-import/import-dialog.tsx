@@ -37,6 +37,11 @@ import {
   formValuesToProjectItem,
   type ProjectFormValues,
 } from "@/features/cv/sections/project-form"
+import { hasPersonalBank } from "@/features/career-bank/actions"
+import {
+  ImportDestinationPicker,
+  type ImportDestination,
+} from "@/features/career-bank/import-destination-picker"
 import type { ResultErrorCode } from "@/lib/result"
 import { ConnectGithubButton } from "./connect-github-button"
 import { RepoList } from "./repo-list"
@@ -44,8 +49,10 @@ import {
   checkGithubConnection,
   extractFromRepo,
   listUserRepos,
+  promoteImportedItemToBank,
   type GithubImportDepth,
   type GithubImportTarget,
+  type PromoteImportedItemInput,
 } from "./actions"
 import type { RepoSummary } from "./octokit"
 
@@ -85,6 +92,9 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
   const [mode, setMode] = useState<GithubImportDepth>("full_code")
   const [step, setStep] = useState<Step>({ name: "list" })
   const [isApplying, setIsApplying] = useState(false)
+  // Decision 8: BOTH importers default to "bank" — no per-importer
+  // divergence. Forced to "cv_only" below whenever `bankAvailable` is false.
+  const [destination, setDestination] = useState<ImportDestination>("bank")
 
   const addProject = useEditorStore((s) => s.addProject)
   const addExperience = useEditorStore((s) => s.addExperience)
@@ -97,6 +107,19 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
   const connectionStatus = connectionQuery.data?.ok
     ? connectionQuery.data.data
     : null
+
+  const bankQuery = useQuery({
+    queryKey: ["personal-bank-exists"],
+    queryFn: () => hasPersonalBank(),
+    enabled: open,
+  })
+  const bankAvailable = bankQuery.data?.ok ? bankQuery.data.data.hasBank : false
+  // The actually-applied destination for this confirm — never trusts
+  // `destination` alone, same defensive gate `ImportDestinationPicker`
+  // itself renders (disabled + forced "cv_only" when no bank exists).
+  const effectiveDestination: ImportDestination = bankAvailable
+    ? destination
+    : "cv_only"
 
   const reposQuery = useQuery({
     queryKey: ["github-repos", includeForks],
@@ -138,7 +161,11 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
           name: result.data.name,
           description: result.data.description,
           url: result.data.url ?? "",
-          bulletsText: result.data.bullets.join("\n"),
+          bullets: result.data.bullets.map((content) => ({
+            id: crypto.randomUUID(),
+            content,
+            sourceMaterialId: null,
+          })),
         },
       })
       return
@@ -170,7 +197,11 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
         role: result.data.role,
         startDate: "",
         endDate: "",
-        bulletsText: result.data.bullets.join("\n"),
+        bullets: result.data.bullets.map((content) => ({
+          id: crypto.randomUUID(),
+          content,
+          sourceMaterialId: null,
+        })),
       },
     })
   }
@@ -210,6 +241,31 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
     return true
   }
 
+  /**
+   * Bank-first (Decision 8): when the destination is "bank", this writes
+   * the bank rows and returns minted `materialId`s BEFORE the draft item is
+   * built, so `sourceMaterialId` rides along in the SAME `addProject`/
+   * `addExperience` call — stamping it afterwards would need a second
+   * reconciliation pass against the store. Returns `null` bullets stamping
+   * on failure so the caller can bail out without touching the draft.
+   */
+  async function stampBankProvenance<
+    B extends { id: string; content: string; sourceMaterialId: string | null },
+  >(input: PromoteImportedItemInput, bullets: B[]): Promise<B[] | null> {
+    const promoted = await promoteImportedItemToBank(cvId, input)
+    if (!promoted.ok) {
+      toast.error(promoted.error)
+      return null
+    }
+    const materialByKey = new Map(
+      promoted.data.bullets.map((b) => [b.clientKey, b.materialId]),
+    )
+    return bullets.map((bullet) => ({
+      ...bullet,
+      sourceMaterialId: materialByKey.get(bullet.id) ?? bullet.sourceMaterialId,
+    }))
+  }
+
   async function handleConfirmProject(
     values: ProjectFormValues,
     repo: RepoSummary,
@@ -220,7 +276,32 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
       return
     }
 
-    addProject(formValuesToProjectItem(values, crypto.randomUUID()))
+    let bullets = values.bullets
+    if (effectiveDestination === "bank") {
+      const stamped = await stampBankProvenance(
+        {
+          target: "project",
+          name: values.name,
+          description: values.description || null,
+          url: values.url || null,
+          bullets: values.bullets.map((b) => ({
+            clientKey: b.id,
+            content: b.content,
+          })),
+          label: `importado: github:${repo.fullName}`,
+        },
+        bullets,
+      )
+      if (!stamped) {
+        setIsApplying(false)
+        return
+      }
+      bullets = stamped
+    }
+
+    addProject(
+      formValuesToProjectItem({ ...values, bullets }, crypto.randomUUID()),
+    )
 
     setIsApplying(false)
     toast.success(`"${repo.name}" agregado como proyecto`)
@@ -238,7 +319,33 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
       return
     }
 
-    addExperience(formValuesToExperienceItem(values, crypto.randomUUID()))
+    let bullets = values.bullets
+    if (effectiveDestination === "bank") {
+      const stamped = await stampBankProvenance(
+        {
+          target: "experience",
+          company: values.company,
+          role: values.role,
+          startDate: values.startDate || null,
+          endDate: values.endDate || null,
+          bullets: values.bullets.map((b) => ({
+            clientKey: b.id,
+            content: b.content,
+          })),
+          label: `importado: github:${repo.fullName}`,
+        },
+        bullets,
+      )
+      if (!stamped) {
+        setIsApplying(false)
+        return
+      }
+      bullets = stamped
+    }
+
+    addExperience(
+      formValuesToExperienceItem({ ...values, bullets }, crypto.randomUUID()),
+    )
 
     setIsApplying(false)
     toast.success(`"${repo.name}" agregado como experiencia`)
@@ -392,10 +499,18 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
             <ProjectForm
               defaultValues={step.draft}
               notice={
-                <ImportNotices
-                  hadReadme={step.hadReadme}
-                  codeDigestWarning={step.codeDigestWarning}
-                />
+                <div className="flex flex-col gap-3">
+                  <ImportDestinationPicker
+                    value={destination}
+                    onChange={setDestination}
+                    bankAvailable={bankAvailable}
+                    idPrefix="github-import-project"
+                  />
+                  <ImportNotices
+                    hadReadme={step.hadReadme}
+                    codeDigestWarning={step.codeDigestWarning}
+                  />
+                </div>
               }
               submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
               submitDisabled={isApplying}
@@ -405,10 +520,18 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
             <ExperienceForm
               defaultValues={step.draft}
               notice={
-                <ImportNotices
-                  hadReadme={step.hadReadme}
-                  codeDigestWarning={step.codeDigestWarning}
-                />
+                <div className="flex flex-col gap-3">
+                  <ImportDestinationPicker
+                    value={destination}
+                    onChange={setDestination}
+                    bankAvailable={bankAvailable}
+                    idPrefix="github-import-experience"
+                  />
+                  <ImportNotices
+                    hadReadme={step.hadReadme}
+                    codeDigestWarning={step.codeDigestWarning}
+                  />
+                </div>
               }
               submitLabel={isApplying ? "Agregando…" : "Agregar al CV"}
               submitDisabled={isApplying}

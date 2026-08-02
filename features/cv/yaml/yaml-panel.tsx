@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useEditorStore } from "@/features/cv/editor-store"
 import type { CvData } from "@/schemas/cv.schema"
 import { YamlEditor } from "./yaml-editor"
+import { fromYamlView } from "./projection"
 import { cvDataToYaml, validateYaml } from "./serialize"
 
 const COMMIT_DEBOUNCE_MS = 500
@@ -17,9 +18,17 @@ const COMMIT_DEBOUNCE_MS = 500
  *
  * Commits are debounced and gated on a valid parse: `replaceDraft` (the
  * store) is only ever called with data that already passed
- * `cvDataSchema.safeParse` inside `validateYaml` — an invalid edit updates
- * local `error` state (surfaced by `YamlEditor`'s inline diagnostics) and
- * leaves the store untouched, per spec.
+ * `yamlCvSchema.safeParse` inside `validateYaml` and then been reconciled
+ * back into `CvData` by `fromYamlView` (career-bank-restructure Decision 5)
+ * — an invalid edit updates local `error` state (surfaced by `YamlEditor`'s
+ * inline diagnostics) and leaves the store untouched, per spec.
+ *
+ * `fromYamlView` is given the STORE's current draft as `previous`, read
+ * fresh via `useEditorStore.getState()` at commit time rather than closed
+ * over from a render — the debounce timer and the unmount-flush cleanup
+ * below both fire from closures that may be stale by the time they run, and
+ * bullet-provenance reconciliation must compare against what the draft
+ * actually is at commit time, not what it was when the closure was created.
  *
  * Unmounting (view switch or CV switch) with a commit still pending inside
  * the debounce window would otherwise silently drop a valid edit — the
@@ -36,7 +45,8 @@ export function YamlPanel({ draft }: { draft: CvData }) {
   function commitIfValid(source: string) {
     const result = validateYaml(source)
     if (result.ok) {
-      replaceDraft(result.data)
+      const previous = useEditorStore.getState().draft ?? draft
+      replaceDraft(fromYamlView(result.data, previous))
     }
     // Invalid parse: store is intentionally left untouched. The inline
     // diagnostic already shown by `YamlEditor` (same `validateYaml` call,

@@ -49,7 +49,7 @@ export function CvWorkspaceShellSkeleton() {
           // 0 on purpose: this is the generic pre-hydration mockup, and most
           // CVs have neither section — inventing blocks for them would make
           // the placeholder taller than the document it stands in for.
-          achievementCount={0}
+          credentialCount={0}
           referenceCount={0}
           className="h-full"
         />

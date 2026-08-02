@@ -81,3 +81,23 @@ export const cvAdaptReviewSchema = z.object({
 })
 
 export type CvAdaptReview = z.infer<typeof cvAdaptReviewSchema>
+
+/**
+ * The same reviewed-and-confirmed shape, for an adaptation that started from
+ * the BANK with no source CV at all (`architecture/bank-produces-cv`).
+ *
+ * Identical to `cvAdaptReviewSchema` minus `sourceCvId` — and that single
+ * missing field is the whole difference between the two paths. With no
+ * source CV, `createCvFromBankAdaptation` reads the contact fields (D11) and
+ * the education/credential/language rows (D14) from the caller's `bank`
+ * instead, which the `bank` table already carries the columns for. Every
+ * other rule — the posting caps re-checked at persistence, notes truncated
+ * rather than rejected, education trusted only for WHICH ids — is the same,
+ * deliberately: two review contracts that drift apart would mean two
+ * different definitions of what an adaptation is allowed to put on a CV.
+ */
+export const bankAdaptReviewSchema = cvAdaptReviewSchema.omit({
+  sourceCvId: true,
+})
+
+export type BankAdaptReview = z.infer<typeof bankAdaptReviewSchema>

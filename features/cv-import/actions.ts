@@ -11,8 +11,17 @@ import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
 import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
 import type { Result } from "@/lib/result"
-import { buildCvSectionQueries } from "@/features/cv/persist-sections"
-import { cvDraftSchema, type CvData } from "@/schemas/cv.schema"
+import {
+  buildCvSectionQueries,
+  flattenSectionBatch,
+} from "@/features/cv/persist-sections"
+import { findPersonalBank } from "@/features/career-bank/ownership"
+import {
+  buildBankMaterialQueries,
+  flattenBankImportBatch,
+} from "@/features/career-bank/build-bank-queries"
+import { importDestinationSchema } from "@/schemas/bank.schema"
+import { cvDraftSchema, type CvData, type CvBullet } from "@/schemas/cv.schema"
 import type { CvImportExtract } from "@/schemas/cv-import.schema"
 import { extractTextFromFile } from "./parse-document"
 import { extractCvFromDocumentText } from "./ai-extract"
@@ -135,6 +144,88 @@ export async function extractCvFromFile(
 export type CvImportReview = CvData
 
 /**
+ * Mints bank rows for every experience/project with bullets — one
+ * `bank_engagement` (reused if a live one matches) + one `bank_material` +
+ * default `bank_material_variant` per bullet, labeled `importado:
+ * {fileName}` — and returns a NEW `CvData` with each promoted bullet's
+ * `sourceMaterialId` stamped in, plus the flattened bank batch to fold into
+ * the SAME `db.batch` the cv insert below runs in. Unlike the GitHub import
+ * path (which cannot be atomic — see `features/github-import/actions.ts`),
+ * PDF import writes everything in one implicit transaction, so there is no
+ * separate "promote" server action here: this is inlined directly into
+ * `createCvFromImport`.
+ */
+async function stampBankProvenance(
+  bankId: string,
+  data: CvData,
+  fileName: string,
+): Promise<{ data: CvData; queries: BatchItem<"pg">[] }> {
+  const label = `importado: ${fileName}`
+  const queries: BatchItem<"pg">[] = []
+
+  const experiences: CvData["experiences"] = []
+  for (const experience of data.experiences) {
+    if (experience.bullets.length === 0) {
+      experiences.push(experience)
+      continue
+    }
+    const { batch, materialIds } = await buildBankMaterialQueries({
+      bankId,
+      engagement: {
+        kind: "job",
+        organization: experience.company ?? "",
+        role: experience.role ?? "",
+        startDate: experience.startDate ?? null,
+        endDate: experience.endDate ?? null,
+      },
+      bullets: experience.bullets.map((bullet) => ({
+        content: bullet.content,
+        label,
+      })),
+    })
+    queries.push(...flattenBankImportBatch(batch))
+    experiences.push({
+      ...experience,
+      bullets: experience.bullets.map((bullet, index): CvBullet => ({
+        ...bullet,
+        sourceMaterialId: materialIds[index] ?? null,
+      })),
+    })
+  }
+
+  const projects: CvData["projects"] = []
+  for (const project of data.projects) {
+    if (project.bullets.length === 0) {
+      projects.push(project)
+      continue
+    }
+    const { batch, materialIds } = await buildBankMaterialQueries({
+      bankId,
+      engagement: {
+        kind: "project",
+        name: project.name ?? "",
+        url: project.url ?? null,
+        description: project.description ?? null,
+      },
+      bullets: project.bullets.map((bullet) => ({
+        content: bullet.content,
+        label,
+      })),
+    })
+    queries.push(...flattenBankImportBatch(batch))
+    projects.push({
+      ...project,
+      bullets: project.bullets.map((bullet, index): CvBullet => ({
+        ...bullet,
+        sourceMaterialId: materialIds[index] ?? null,
+      })),
+    })
+  }
+
+  return { data: { ...data, experiences, projects }, queries }
+}
+
+/**
  * Creates a brand new `cv` row from a reviewed AI extraction and seeds its
  * child sections in the same batched insert `saveDraft` uses
  * (`buildCvSectionQueries` in `features/cv/actions.ts`) — no second copy of
@@ -144,10 +235,24 @@ export type CvImportReview = CvData
  * `cvDraftSchema` here, same discipline as `saveDraft`'s own `input:
  * unknown` — a value crossing the server-action wire from a client
  * component is never trusted just because the client-side TypeScript type
- * (`CvImportReview`) says it's shaped correctly.
+ * (`CvImportReview`) says it's shaped correctly. `destination` is `unknown`
+ * for the same reason.
+ *
+ * `fileName` is ONLY used for the bank branch's variant label (`importado:
+ * {fileName}`, mirroring GitHub import's `importado: github:{owner}/
+ * {repo}`) — never persisted anywhere else, never trusted for anything
+ * beyond a human-readable provenance note.
+ *
+ * Bank branch (Decision 8): resolves the caller's live personal bank via
+ * `findPersonalBank` (read-only — a file upload MUST NOT silently mint a
+ * bank the user never asked to create, spec: "CV with no bank"). No live
+ * bank ⇒ falls back to CV-only exactly as if the user had picked it
+ * explicitly; `cv.bank_id` stays null.
  */
 export async function createCvFromImport(
   reviewed: unknown,
+  destination: unknown,
+  fileName: string,
 ): Promise<Result<{ id: string }>> {
   const userId = await getSessionUserId()
   if (!userId)
@@ -161,25 +266,52 @@ export async function createCvFromImport(
       code: "invalid_input",
     }
   }
-  const data = parsed.data
+  let data = parsed.data
+
+  // Fail-safe default: an unparseable destination never silently writes to
+  // the bank.
+  const destinationParsed = importDestinationSchema.safeParse(destination)
+  const wantsBank =
+    destinationParsed.success && destinationParsed.data === "bank"
 
   const id = createId()
   const title = data.fullName?.trim()
     ? `CV de ${data.fullName.trim()}`
     : "CV importado"
 
+  let bankId: string | null = null
+  let bankQueries: BatchItem<"pg">[] = []
+
+  if (wantsBank) {
+    const personalBank = await findPersonalBank(userId)
+    if (personalBank) {
+      bankId = personalBank.id
+      const stamped = await stampBankProvenance(
+        personalBank.id,
+        data,
+        fileName.trim() || "archivo",
+      )
+      data = stamped.data
+      bankQueries = stamped.queries
+    }
+  }
+
   const queries: BatchItem<"pg">[] = [
     db.insert(cv).values({
       id,
       userId,
+      bankId,
       title,
       fullName: data.fullName ?? null,
       email: data.email ?? null,
       phone: data.phone ?? null,
       location: data.location ?? null,
+      linkedinUrl: data.linkedinUrl ?? null,
+      websiteUrl: data.websiteUrl ?? null,
       summary: data.summary ?? null,
     }),
-    ...buildCvSectionQueries(id, data),
+    ...bankQueries,
+    ...flattenSectionBatch(buildCvSectionQueries(id, data)),
   ]
 
   await db.batch(queries as [BatchItem<"pg">, ...BatchItem<"pg">[]])

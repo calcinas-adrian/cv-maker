@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { ProjectItem } from "@/schemas/cv.schema"
+import { BulletListField } from "./bullet-list-field"
 
 /**
  * Shared form contract for a single `project` item — used both by the
@@ -24,12 +25,26 @@ import type { ProjectItem } from "@/schemas/cv.schema"
  * step (`features/github-import/import-dialog.tsx`), so an AI-extracted
  * draft is edited with the exact same fields/validation a manually-entered
  * project would be, never a parallel/forked form.
+ *
+ * `bullets: BulletDraft[]` replaces the old `bulletsText: string`, mirroring
+ * `experience-form.tsx`'s Decision 6 rewrite.
  */
 export const projectFormSchema = z.object({
   name: z.string().min(1, "Obligatorio"),
   description: z.string().optional(),
   url: z.string().optional(),
-  bulletsText: z.string().optional(),
+  // No `.optional().default([])` — see the matching note in
+  // `experience-form.tsx`: `projectItemToFormValues` always supplies a
+  // concrete array as `defaultValues`, and a zod default here would split
+  // `zodResolver`'s inferred `Resolver<...>` generic into two incompatible
+  // shapes.
+  bullets: z.array(
+    z.object({
+      id: z.string(),
+      content: z.string(),
+      sourceMaterialId: z.string().nullable(),
+    }),
+  ),
 })
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>
@@ -41,7 +56,7 @@ export function projectItemToFormValues(
     name: item?.name ?? "",
     description: item?.description ?? "",
     url: item?.url ?? "",
-    bulletsText: item?.bullets?.join("\n") ?? "",
+    bullets: item?.bullets ?? [],
   }
 }
 
@@ -49,19 +64,12 @@ export function formValuesToProjectItem(
   values: ProjectFormValues,
   id: string,
 ): ProjectItem {
-  const bullets = values.bulletsText
-    ? values.bulletsText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : []
-
   return {
     id,
     name: values.name,
     description: values.description || undefined,
     url: values.url || null,
-    bullets,
+    bullets: values.bullets,
   }
 }
 
@@ -150,13 +158,13 @@ export function ProjectForm({
           />
           <FormField
             control={form.control}
-            name="bulletsText"
+            name="bullets"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Viñetas (una por línea)</FormLabel>
-                <FormControl>
-                  <Textarea rows={4} {...field} />
-                </FormControl>
+                <BulletListField
+                  bullets={field.value}
+                  onChange={field.onChange}
+                />
                 <FormMessage />
               </FormItem>
             )}

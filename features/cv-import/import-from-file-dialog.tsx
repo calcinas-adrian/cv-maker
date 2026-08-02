@@ -3,6 +3,7 @@
 import { type ChangeEvent, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import { Loader2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 import { AiRunPreflight } from "@/components/ai-run-preflight"
@@ -29,6 +30,11 @@ import type {
   SkillExtract,
 } from "@/schemas/cv-import.schema"
 import { listModelOptions } from "@/features/ai-providers/actions"
+import { hasPersonalBank } from "@/features/career-bank/actions"
+import {
+  ImportDestinationPicker,
+  type ImportDestination,
+} from "@/features/career-bank/import-destination-picker"
 import { createCvFromImport, extractCvFromFile } from "./actions"
 import {
   ACCEPTED_EXTENSIONS,
@@ -107,7 +113,16 @@ function reviewStateToCvData(state: ReviewState): CvData {
         role: item.data.role,
         startDate: item.data.startDate,
         endDate: item.data.endDate,
-        bullets: item.data.bullets,
+        // Extracted bullets carry no bank identity of their own here — each
+        // gets a fresh id and `sourceMaterialId: null`, same as a hand-typed
+        // bullet. `createCvFromImport`'s bank branch (Decision 8) stamps
+        // real `sourceMaterialId`s server-side when the destination is
+        // "bank", AFTER this function runs; this stays the CV-only shape.
+        bullets: item.data.bullets.map((content) => ({
+          id: crypto.randomUUID(),
+          content,
+          sourceMaterialId: null,
+        })),
       })),
     projects: state.projects
       .filter((item) => item.included)
@@ -116,7 +131,11 @@ function reviewStateToCvData(state: ReviewState): CvData {
         name: item.data.name,
         description: item.data.description,
         url: item.data.url,
-        bullets: item.data.bullets,
+        bullets: item.data.bullets.map((content) => ({
+          id: crypto.randomUUID(),
+          content,
+          sourceMaterialId: null,
+        })),
       })),
     education: state.education
       .filter((item) => item.included)
@@ -134,13 +153,14 @@ function reviewStateToCvData(state: ReviewState): CvData {
         name: item.data.name,
         category: item.data.category,
       })),
-    // Always empty: `cvExtractSchema` has no achievements/references output
-    // channel, so the model never produces them and there is nothing to
-    // review here. The user adds them by hand in the editor afterwards.
-    // Kept as explicit `[]` rather than omitted so this stays a visible
-    // decision — and so adding an extraction channel later fails loudly
-    // here instead of silently dropping the extracted rows.
-    achievements: [],
+    // Always empty: `cvExtractSchema` has no credentials/languages/
+    // references output channel, so the model never produces them and
+    // there is nothing to review here. The user adds them by hand in the
+    // editor afterwards. Kept as explicit `[]` rather than omitted so this
+    // stays a visible decision — and so adding an extraction channel later
+    // fails loudly here instead of silently dropping the extracted rows.
+    credentials: [],
+    languages: [],
     references: [],
   }
 }
@@ -164,6 +184,22 @@ export function ImportFromFileDialog() {
   const [defaultModelLabel, setDefaultModelLabel] = useState<string | null>(
     null,
   )
+  // Decision 8: BOTH importers default to "bank" — no per-importer
+  // divergence. Forced to "cv_only" below whenever `bankAvailable` is false.
+  const [destination, setDestination] = useState<ImportDestination>("bank")
+
+  const bankQuery = useQuery({
+    queryKey: ["personal-bank-exists"],
+    queryFn: () => hasPersonalBank(),
+    enabled: open,
+  })
+  const bankAvailable = bankQuery.data?.ok ? bankQuery.data.data.hasBank : false
+  // The actually-applied destination — never trusts `destination` alone,
+  // same defensive gate `ImportDestinationPicker` itself renders (disabled +
+  // forced "cv_only" when no bank exists).
+  const effectiveDestination: ImportDestination = bankAvailable
+    ? destination
+    : "cv_only"
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
@@ -268,7 +304,11 @@ export function ImportFromFileDialog() {
     setIsCreating(true)
 
     const draft = reviewStateToCvData(step)
-    const result = await createCvFromImport(draft)
+    const result = await createCvFromImport(
+      draft,
+      effectiveDestination,
+      pickedFile?.name ?? "archivo",
+    )
 
     setIsCreating(false)
 
@@ -365,6 +405,12 @@ export function ImportFromFileDialog() {
         ) : step.name === "review" ? (
           <>
             <SheetBody className="flex flex-col gap-4">
+              <ImportDestinationPicker
+                value={destination}
+                onChange={setDestination}
+                bankAvailable={bankAvailable}
+                idPrefix="file-import"
+              />
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">

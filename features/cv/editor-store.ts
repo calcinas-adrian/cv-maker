@@ -3,7 +3,7 @@ import { temporal } from "zundo"
 import { throttle } from "es-toolkit"
 import {
   DEFAULT_THEME,
-  type AchievementItem,
+  type CredentialItem,
   type CvData,
   type CvTheme,
   type EducationItem,
@@ -18,7 +18,7 @@ type SectionKey =
   | "projects"
   | "education"
   | "skills"
-  | "achievements"
+  | "credentials"
   | "references"
 
 /** The item type stored in a given list section, e.g. `"skills"` -> `SkillItem`. */
@@ -105,11 +105,11 @@ type EditorState = {
   moveSkill: (id: string, direction: Direction) => void
   duplicateSkill: (sourceId: string, newId: string) => void
 
-  addAchievement: (item: AchievementItem) => void
-  updateAchievement: (id: string, patch: Partial<AchievementItem>) => void
-  removeAchievement: (id: string) => void
-  moveAchievement: (id: string, direction: Direction) => void
-  duplicateAchievement: (sourceId: string, newId: string) => void
+  addCredential: (item: CredentialItem) => void
+  updateCredential: (id: string, patch: Partial<CredentialItem>) => void
+  removeCredential: (id: string) => void
+  moveCredential: (id: string, direction: Direction) => void
+  duplicateCredential: (sourceId: string, newId: string) => void
 
   addReference: (item: ReferenceItem) => void
   updateReference: (id: string, patch: Partial<ReferenceItem>) => void
@@ -129,7 +129,7 @@ export const EMPTY_EXPERIENCES: ExperienceItem[] = []
 export const EMPTY_PROJECTS: ProjectItem[] = []
 export const EMPTY_EDUCATION: EducationItem[] = []
 export const EMPTY_SKILLS: SkillItem[] = []
-export const EMPTY_ACHIEVEMENTS: AchievementItem[] = []
+export const EMPTY_CREDENTIALS: CredentialItem[] = []
 export const EMPTY_REFERENCES: ReferenceItem[] = []
 
 /**
@@ -176,7 +176,7 @@ function moveItem<T extends { id: string }>(
 
 /**
  * Deep copy under a new id. `structuredClone` rather than a `{ ...item }`
- * spread on purpose: `ExperienceItem`/`ProjectItem` carry a `bullets: string[]`,
+ * spread on purpose: `ExperienceItem`/`ProjectItem` carry a `bullets: CvBullet[]`,
  * and a shallow copy would leave the clone and the original sharing that one
  * array. It works today only because every edit path replaces `bullets`
  * wholesale — a single future in-place `bullets.push` would silently mutate
@@ -253,7 +253,7 @@ export const useEditorStore = create<EditorState>()(
       const projects = createSectionActions("projects")
       const education = createSectionActions("education")
       const skills = createSectionActions("skills")
-      const achievements = createSectionActions("achievements")
+      const credentials = createSectionActions("credentials")
       const references = createSectionActions("references")
 
       return {
@@ -293,11 +293,11 @@ export const useEditorStore = create<EditorState>()(
         moveSkill: skills.move,
         duplicateSkill: skills.duplicate,
 
-        addAchievement: achievements.add,
-        updateAchievement: achievements.update,
-        removeAchievement: achievements.remove,
-        moveAchievement: achievements.move,
-        duplicateAchievement: achievements.duplicate,
+        addCredential: credentials.add,
+        updateCredential: credentials.update,
+        removeCredential: credentials.remove,
+        moveCredential: credentials.move,
+        duplicateCredential: credentials.duplicate,
 
         addReference: references.add,
         updateReference: references.update,

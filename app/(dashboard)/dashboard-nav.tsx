@@ -11,7 +11,7 @@ import { signOut } from "@/lib/auth-client"
 const NAV_LINKS = [
   { href: "/dashboard", label: "Tus CVs" },
   { href: "/applications", label: "Postulaciones" },
-  { href: "/career-material", label: "Tu material" },
+  { href: "/bank", label: "Tu banco" },
   { href: "/settings", label: "Proveedores de IA" },
 ]
 

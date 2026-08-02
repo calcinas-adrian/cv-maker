@@ -350,7 +350,7 @@ export default function TypstPreview({
             projectCount={data.projects.length}
             educationCount={data.education.length}
             skillCount={data.skills.length}
-            achievementCount={data.achievements.length}
+            credentialCount={data.credentials.length}
             referenceCount={data.references.length}
             className="h-full"
           />

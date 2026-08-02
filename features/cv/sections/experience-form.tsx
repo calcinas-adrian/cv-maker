@@ -15,8 +15,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import type { ExperienceItem } from "@/schemas/cv.schema"
+import { BulletListField } from "./bullet-list-field"
 
 /**
  * Shared form contract for a single `experience` item — used both by the
@@ -33,13 +33,30 @@ import type { ExperienceItem } from "@/schemas/cv.schema"
  * empty defaults simply mean the "Guardar" button stays blocked by
  * `company`'s `min(1)` validation until the user fills it in during review,
  * exactly like the manual add flow already requires.
+ *
+ * `bullets: BulletDraft[]` replaces the old `bulletsText: string` per
+ * `sdd/career-bank-restructure/design` Decision 6 — itemized, addressable
+ * rows instead of a single multi-line textarea re-split on every save.
  */
 export const experienceFormSchema = z.object({
   company: z.string().min(1, "Obligatorio"),
   role: z.string().min(1, "Obligatorio"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  bulletsText: z.string().optional(),
+  // No `.optional().default([])` here (unlike `cvBulletSchema`'s array in
+  // `schemas/cv.schema.ts`): `experienceItemToFormValues` below always
+  // supplies a concrete array as `defaultValues`, and giving this field an
+  // input/output split via zod's default splits `zodResolver`'s inferred
+  // `Resolver<...>` generic into two incompatible shapes — required-with-
+  // no-default keeps the form's field type and the schema's parsed type
+  // identical, which is what `useForm<ExperienceFormValues>` needs.
+  bullets: z.array(
+    z.object({
+      id: z.string(),
+      content: z.string(),
+      sourceMaterialId: z.string().nullable(),
+    }),
+  ),
 })
 
 export type ExperienceFormValues = z.infer<typeof experienceFormSchema>
@@ -52,7 +69,7 @@ export function experienceItemToFormValues(
     role: item?.role ?? "",
     startDate: item?.startDate ?? "",
     endDate: item?.endDate ?? "",
-    bulletsText: item?.bullets?.join("\n") ?? "",
+    bullets: item?.bullets ?? [],
   }
 }
 
@@ -60,20 +77,13 @@ export function formValuesToExperienceItem(
   values: ExperienceFormValues,
   id: string,
 ): ExperienceItem {
-  const bullets = values.bulletsText
-    ? values.bulletsText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : []
-
   return {
     id,
     company: values.company,
     role: values.role,
     startDate: values.startDate || null,
     endDate: values.endDate || null,
-    bullets,
+    bullets: values.bullets,
   }
 }
 
@@ -172,13 +182,13 @@ export function ExperienceForm({
           </div>
           <FormField
             control={form.control}
-            name="bulletsText"
+            name="bullets"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Viñetas (una por línea)</FormLabel>
-                <FormControl>
-                  <Textarea rows={4} {...field} />
-                </FormControl>
+                <BulletListField
+                  bullets={field.value}
+                  onChange={field.onChange}
+                />
                 <FormMessage />
               </FormItem>
             )}

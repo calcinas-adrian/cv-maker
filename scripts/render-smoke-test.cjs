@@ -69,24 +69,54 @@ const sampleCv = {
     { id: "s3", name: "Docker", category: null },
     { id: "s4", name: "Diseño de APIs", category: null },
   ],
-  achievements: [
+  // `credentials`/`languages` — mirrors `features/render/typst-payload.ts`'s
+  // `toTypstPayload` field set (career-bank-restructure Phase 9): the old
+  // flat `achievements` shape (`title`/`date`) was replaced with the full
+  // `kind`/`issuedAt`/`expiresAt`/`credentialId`/`credentialUrl` set, and a
+  // sibling `languages` section was added.
+  credentials: [
     {
       id: "a1",
-      title: "Primer puesto — Hackathon interno de plataforma",
+      kind: "award",
+      name: "Primer puesto — Hackathon interno de plataforma",
       issuer: "Tecnología Ñandú S.A.",
-      date: "Mar 2023",
+      issuedAt: "Mar 2023",
+      expiresAt: null,
+      credentialId: null,
+      credentialUrl: null,
       description:
         "Prototipo de observabilidad adoptado luego por tres equipos.",
     },
-    // No issuer/date/description — verifies the header degrades cleanly to
-    // just a title, with no stray separators.
+    // Certification with credentialId/credentialUrl — exercises the gray
+    // meta line's full "kind · id · url" join.
     {
       id: "a2",
-      title: "Ponente en NerdearLA",
-      issuer: null,
-      date: null,
+      kind: "certification",
+      name: "AWS Certified Solutions Architect",
+      issuer: "Amazon Web Services",
+      issuedAt: "2022",
+      expiresAt: "2025",
+      credentialId: "ABC-123",
+      credentialUrl: "https://example.com/verify/abc-123",
       description: null,
     },
+    // No issuer/dates/description — verifies the header degrades cleanly to
+    // just a name, with no stray separators.
+    {
+      id: "a3",
+      kind: "award",
+      name: "Ponente en NerdearLA",
+      issuer: null,
+      issuedAt: null,
+      expiresAt: null,
+      credentialId: null,
+      credentialUrl: null,
+      description: null,
+    },
+  ],
+  languages: [
+    { id: "l1", name: "Español", level: "Nativo" },
+    { id: "l2", name: "Inglés", level: "Avanzado" },
   ],
   references: [
     {
@@ -144,11 +174,19 @@ function toTypstPayload(cv) {
       name: s.name ?? "",
       category: s.category ?? "",
     })),
-    achievements: (cv.achievements ?? []).map((a) => ({
-      title: a.title ?? "",
-      issuer: a.issuer ?? "",
-      date: a.date ?? "",
-      description: a.description ?? "",
+    credentials: (cv.credentials ?? []).map((c) => ({
+      kind: c.kind ?? "",
+      name: c.name ?? "",
+      issuer: c.issuer ?? "",
+      issuedAt: c.issuedAt ?? "",
+      expiresAt: c.expiresAt ?? "",
+      credentialId: c.credentialId ?? "",
+      credentialUrl: c.credentialUrl ?? "",
+      description: c.description ?? "",
+    })),
+    languages: (cv.languages ?? []).map((l) => ({
+      name: l.name ?? "",
+      level: l.level ?? "",
     })),
     references: (cv.references ?? []).map((r) => ({
       name: r.name ?? "",

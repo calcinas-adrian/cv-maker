@@ -138,16 +138,16 @@ export function AdaptationHistory({ items }: { items: AdaptationListItem[] }) {
               <p className="text-muted-foreground text-xs">
                 {item.source ? (
                   <>
-                    Adaptado desde{" "}
+                    Adaptado desde el banco{" "}
                     <Link
-                      href={`/cv/${item.source.id}/edit`}
+                      href="/bank"
                       className="hover:text-foreground underline underline-offset-2"
                     >
-                      {item.source.title}
+                      {item.source.name}
                     </Link>
                   </>
                 ) : (
-                  "El CV de origen ya no existe"
+                  "Sin banco de origen registrado"
                 )}
               </p>
             </CardHeader>

@@ -126,7 +126,7 @@ export function CvWorkspaceShell({
               educationCount={1}
               skillCount={1}
               // 0 on purpose — see `cv-workspace-shell-skeleton.tsx`.
-              achievementCount={0}
+              credentialCount={0}
               referenceCount={0}
               className="h-full"
             />

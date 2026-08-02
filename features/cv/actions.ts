@@ -1,20 +1,29 @@
 "use server"
 
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm"
 import { createId } from "@paralleldrive/cuid2"
 import { db } from "@/db"
 import {
-  achievement,
   cv,
+  cvBullet,
+  cvCredential,
+  cvEducation,
+  cvExperience,
+  cvLanguage,
+  cvProject,
+  cvReference,
+  cvSkill,
   cvVersion,
-  education,
-  experience,
-  project,
-  reference,
-  skill,
 } from "@/db/schema"
-import { cvDraftSchema, type CvData } from "@/schemas/cv.schema"
-import { buildCvSectionQueries } from "@/features/cv/persist-sections"
+import {
+  cvDraftSchema,
+  type CvData,
+  type CredentialKind,
+} from "@/schemas/cv.schema"
+import {
+  buildCvSectionQueries,
+  flattenSectionBatch,
+} from "@/features/cv/persist-sections"
 import { getSessionUserId, findOwnedCv } from "@/features/cv/ownership"
 import type { BatchItem } from "drizzle-orm/batch"
 import type { Result } from "@/lib/result"
@@ -66,18 +75,19 @@ export async function renameCv(
 /**
  * SOFT-deletes a CV: stamps `cv.deleted_at` and touches nothing else.
  *
- * Every child table, every `cv_version` snapshot and every `cv_adaptation`
+ * Every child table, every `cv_version` snapshot and every `adaptation`
  * row is left exactly as it is. That is the whole design — because nothing
  * is destroyed, recovery is a single `UPDATE ... SET deleted_at = NULL`
  * (see `scripts/restore.mjs`) and the CV comes back with its sections,
  * history and provenance intact. There is deliberately no trash UI: this
  * app's recovery path is the owner running that script on request.
  *
- * A side effect worth knowing: `cv_adaptation.sourceCvId` is declared
- * `onDelete: "set null"`, so a hard delete here used to silently erase the
- * link between an adapted CV and the CV it came from. Soft delete never
- * fires that FK action, so deleting a source CV now PRESERVES the
- * provenance of everything derived from it.
+ * `adaptation.cvId` is `onDelete: "cascade"` — since the bank restructure,
+ * `adaptation` has no `sourceCvId` to preserve (it reads only the bank, not
+ * sibling CVs — see `db/schema.ts`'s note on `adaptation`), so soft delete
+ * here has no cross-adaptation side effect left to worry about; the only
+ * remaining concern is `adaptation.bankId`'s `set null`, unrelated to `cv`
+ * deletion.
  *
  * `updatedAt` is deliberately not touched, same reasoning as `renameCv`:
  * deleting is not a content edit and must not collide with `saveDraft`'s
@@ -116,39 +126,86 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
   const owned = await findOwnedCv(cvId, userId)
   if (!owned) return { ok: false, error: "No encontrado", code: "not_found" }
 
-  const [experiences, projects, educations, skills, achievements, references] =
-    await Promise.all([
-      db
-        .select()
-        .from(experience)
-        .where(eq(experience.cvId, cvId))
-        .orderBy(asc(experience.sortOrder)),
-      db
-        .select()
-        .from(project)
-        .where(eq(project.cvId, cvId))
-        .orderBy(asc(project.sortOrder)),
-      db
-        .select()
-        .from(education)
-        .where(eq(education.cvId, cvId))
-        .orderBy(asc(education.sortOrder)),
-      db
-        .select()
-        .from(skill)
-        .where(eq(skill.cvId, cvId))
-        .orderBy(asc(skill.sortOrder)),
-      db
-        .select()
-        .from(achievement)
-        .where(eq(achievement.cvId, cvId))
-        .orderBy(asc(achievement.sortOrder)),
-      db
-        .select()
-        .from(reference)
-        .where(eq(reference.cvId, cvId))
-        .orderBy(asc(reference.sortOrder)),
-    ])
+  const [
+    experiences,
+    projects,
+    educations,
+    skills,
+    credentials,
+    languages,
+    references,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(cvExperience)
+      .where(eq(cvExperience.cvId, cvId))
+      .orderBy(asc(cvExperience.sortOrder)),
+    db
+      .select()
+      .from(cvProject)
+      .where(eq(cvProject.cvId, cvId))
+      .orderBy(asc(cvProject.sortOrder)),
+    db
+      .select()
+      .from(cvEducation)
+      .where(eq(cvEducation.cvId, cvId))
+      .orderBy(asc(cvEducation.sortOrder)),
+    db
+      .select()
+      .from(cvSkill)
+      .where(eq(cvSkill.cvId, cvId))
+      .orderBy(asc(cvSkill.sortOrder)),
+    db
+      .select()
+      .from(cvCredential)
+      .where(eq(cvCredential.cvId, cvId))
+      .orderBy(asc(cvCredential.sortOrder)),
+    db
+      .select()
+      .from(cvLanguage)
+      .where(eq(cvLanguage.cvId, cvId))
+      .orderBy(asc(cvLanguage.sortOrder)),
+    db
+      .select()
+      .from(cvReference)
+      .where(eq(cvReference.cvId, cvId))
+      .orderBy(asc(cvReference.sortOrder)),
+  ])
+
+  // `cv_bullet` has no `cv_id` column (see `db/schema.ts`), so its rows are
+  // reached through the parent experience/project ids fetched above, not
+  // through `cvId` directly. Skip the query entirely when there are no
+  // parents to match — an empty `inArray(...)` is a needless round trip.
+  const experienceIds = experiences.map((e) => e.id)
+  const projectIds = projects.map((p) => p.id)
+  const bulletParentConditions = [
+    ...(experienceIds.length > 0
+      ? [inArray(cvBullet.experienceId, experienceIds)]
+      : []),
+    ...(projectIds.length > 0 ? [inArray(cvBullet.projectId, projectIds)] : []),
+  ]
+  const bullets =
+    bulletParentConditions.length > 0
+      ? await db
+          .select()
+          .from(cvBullet)
+          .where(or(...bulletParentConditions))
+          .orderBy(asc(cvBullet.sortOrder))
+      : []
+
+  const bulletsByExperienceId = new Map<string, typeof bullets>()
+  const bulletsByProjectId = new Map<string, typeof bullets>()
+  for (const b of bullets) {
+    if (b.experienceId) {
+      const list = bulletsByExperienceId.get(b.experienceId) ?? []
+      list.push(b)
+      bulletsByExperienceId.set(b.experienceId, list)
+    } else if (b.projectId) {
+      const list = bulletsByProjectId.get(b.projectId) ?? []
+      list.push(b)
+      bulletsByProjectId.set(b.projectId, list)
+    }
+  }
 
   return {
     ok: true,
@@ -157,6 +214,8 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
       email: owned.email ?? undefined,
       phone: owned.phone ?? undefined,
       location: owned.location ?? undefined,
+      linkedinUrl: owned.linkedinUrl ?? undefined,
+      websiteUrl: owned.websiteUrl ?? undefined,
       summary: owned.summary ?? undefined,
       experiences: experiences.map((e) => ({
         id: e.id,
@@ -164,14 +223,22 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
         role: e.role,
         startDate: e.startDate,
         endDate: e.endDate,
-        bullets: e.bullets,
+        bullets: (bulletsByExperienceId.get(e.id) ?? []).map((b) => ({
+          id: b.id,
+          content: b.content,
+          sourceMaterialId: b.sourceMaterialId,
+        })),
       })),
       projects: projects.map((p) => ({
         id: p.id,
         name: p.name,
         description: p.description ?? undefined,
         url: p.url,
-        bullets: p.bullets,
+        bullets: (bulletsByProjectId.get(p.id) ?? []).map((b) => ({
+          id: b.id,
+          content: b.content,
+          sourceMaterialId: b.sourceMaterialId,
+        })),
       })),
       education: educations.map((ed) => ({
         id: ed.id,
@@ -185,12 +252,21 @@ export async function getCvDraft(cvId: string): Promise<Result<CvData>> {
         name: s.name,
         category: s.category,
       })),
-      achievements: achievements.map((a) => ({
-        id: a.id,
-        title: a.title,
-        issuer: a.issuer,
-        date: a.date,
-        description: a.description,
+      credentials: credentials.map((c) => ({
+        id: c.id,
+        kind: c.kind as CredentialKind,
+        name: c.name,
+        issuer: c.issuer,
+        issuedAt: c.issuedAt,
+        expiresAt: c.expiresAt,
+        credentialId: c.credentialId,
+        credentialUrl: c.credentialUrl,
+        description: c.description,
+      })),
+      languages: languages.map((l) => ({
+        id: l.id,
+        name: l.name,
+        level: l.level,
       })),
       references: references.map((r) => ({
         id: r.id,
@@ -249,11 +325,13 @@ export async function saveDraft(
         email: data.email ?? null,
         phone: data.phone ?? null,
         location: data.location ?? null,
+        linkedinUrl: data.linkedinUrl ?? null,
+        websiteUrl: data.websiteUrl ?? null,
         summary: data.summary ?? null,
         updatedAt: now,
       })
       .where(eq(cv.id, cvId)),
-    ...buildCvSectionQueries(cvId, data),
+    ...flattenSectionBatch(buildCvSectionQueries(cvId, data)),
   ]
 
   await db.batch(queries as [BatchItem<"pg">, ...BatchItem<"pg">[]])

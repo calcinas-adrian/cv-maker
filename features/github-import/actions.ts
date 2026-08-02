@@ -1,12 +1,26 @@
 "use server"
 
 import { headers } from "next/headers"
+import { eq } from "drizzle-orm"
 import { APICallError } from "ai"
+import { z } from "zod"
+import type { BatchItem } from "drizzle-orm/batch"
 import { auth } from "@/lib/auth"
+import { db } from "@/db"
+import { cv } from "@/db/schema"
 import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
 import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
 import { getCvDraft } from "@/features/cv/actions"
+import {
+  findPersonalBank,
+  resolveCvAndBank,
+} from "@/features/career-bank/ownership"
+import {
+  buildBankMaterialQueries,
+  flattenBankImportBatch,
+  type BankEngagementSeed,
+} from "@/features/career-bank/build-bank-queries"
 import type { Result } from "@/lib/result"
 import type {
   ExperienceExtract,
@@ -232,5 +246,144 @@ export async function extractFromRepo(
       }),
       code: "provider_error",
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bank destination (Decision 8) — GitHub import never touches the database
+// on its own (the confirm handlers below only call client-side zustand
+// actions), so promoting a reviewed draft to the bank needs its OWN server
+// action, called BEFORE `addExperience`/`addProject` in `import-dialog.tsx`.
+// It writes the bank rows and returns the minted ids so the caller can stamp
+// `sourceMaterialId` onto the draft items before its single tracked `set()`
+// — stamping provenance after that call is impossible without a second
+// reconciliation pass.
+// ---------------------------------------------------------------------------
+
+const promoteImportedBulletInputSchema = z.object({
+  clientKey: z.string(),
+  content: z.string().trim().min(1),
+})
+
+const promoteImportedItemInputSchema = z.discriminatedUnion("target", [
+  z.object({
+    target: z.literal("experience"),
+    company: z.string().trim().min(1),
+    role: z.string().trim().min(1),
+    startDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    bullets: z.array(promoteImportedBulletInputSchema),
+    label: z.string().max(200),
+  }),
+  z.object({
+    target: z.literal("project"),
+    name: z.string().trim().min(1),
+    description: z.string().nullable().optional(),
+    url: z.string().nullable().optional(),
+    bullets: z.array(promoteImportedBulletInputSchema),
+    label: z.string().max(200),
+  }),
+])
+
+export type PromoteImportedItemInput = z.infer<
+  typeof promoteImportedItemInputSchema
+>
+
+/**
+ * Writes the bank side of a GitHub-imported experience/project: reuses (or
+ * mints) a `bank_engagement` for the company/project, then one
+ * `bank_material` + default `bank_material_variant` per bullet, each variant
+ * labeled `importado: github:{owner}/{repo}` (the weaker provenance of an
+ * AI-extracted bullet is handled by LABELING, not by skipping the bank).
+ * Stamps `cv.bank_id` onto the target CV so later reads (e.g. adaptation
+ * forwarding a source CV's bank) see the link.
+ *
+ * The destination bank is ALWAYS the caller's own live personal bank,
+ * resolved server-side via `findPersonalBank` + `resolveCvAndBank` — never
+ * trusted from the request payload, per the ownership invariant. The picker
+ * in `import-dialog.tsx` only offers "Banco" once this same check confirms a
+ * bank exists (`hasPersonalBank`), so reaching this function with no
+ * personal bank is a race condition, not the expected path — handled as an
+ * ordinary failure result, not a silent bank creation (a GitHub import must
+ * not mint a bank behind the user's back any more than a file upload may).
+ */
+export async function promoteImportedItemToBank(
+  cvId: string,
+  input: unknown,
+): Promise<
+  Result<{
+    engagementId: string | null
+    bullets: { clientKey: string; materialId: string }[]
+  }>
+> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const parsed = promoteImportedItemInputSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Datos de importación inválidos",
+      code: "invalid_input",
+    }
+  }
+
+  const personalBank = await findPersonalBank(userId)
+  if (!personalBank) {
+    return {
+      ok: false,
+      error: "No hay un banco disponible para este usuario",
+      code: "not_found",
+    }
+  }
+
+  const resolved = await resolveCvAndBank(cvId, personalBank.id, userId)
+  if (!resolved || !resolved.bank) {
+    return { ok: false, error: "No encontrado", code: "not_found" }
+  }
+
+  const data = parsed.data
+  const engagement: BankEngagementSeed =
+    data.target === "experience"
+      ? {
+          kind: "job",
+          organization: data.company,
+          role: data.role,
+          startDate: data.startDate ?? null,
+          endDate: data.endDate ?? null,
+        }
+      : {
+          kind: "project",
+          name: data.name,
+          url: data.url ?? null,
+          description: data.description ?? null,
+        }
+
+  const { batch, engagementId, materialIds } = await buildBankMaterialQueries({
+    bankId: resolved.bank.id,
+    engagement,
+    bullets: data.bullets.map((bullet) => ({
+      content: bullet.content,
+      label: data.label,
+    })),
+  })
+
+  const queries: BatchItem<"pg">[] = [
+    ...flattenBankImportBatch(batch),
+    db.update(cv).set({ bankId: resolved.bank.id }).where(eq(cv.id, cvId)),
+  ]
+
+  await db.batch(queries as [BatchItem<"pg">, ...BatchItem<"pg">[]])
+
+  return {
+    ok: true,
+    data: {
+      engagementId,
+      bullets: data.bullets.map((bullet, index) => ({
+        clientKey: bullet.clientKey,
+        materialId: materialIds[index],
+      })),
+    },
   }
 }

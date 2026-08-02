@@ -41,11 +41,19 @@ export type TypstCvPayload = {
     name: string
     category: string
   }[]
-  achievements: {
-    title: string
+  credentials: {
+    kind: string
+    name: string
     issuer: string
-    date: string
+    issuedAt: string
+    expiresAt: string
+    credentialId: string
+    credentialUrl: string
     description: string
+  }[]
+  languages: {
+    name: string
+    level: string
   }[]
   references: {
     name: string
@@ -83,13 +91,13 @@ export function toTypstPayload(cv: CvData): TypstCvPayload {
       role: e.role ?? "",
       startDate: e.startDate ?? "",
       endDate: e.endDate ?? "",
-      bullets: e.bullets ?? [],
+      bullets: (e.bullets ?? []).map((b) => b.content),
     })),
     projects: (cv.projects ?? []).map((p) => ({
       name: p.name ?? "",
       description: p.description ?? "",
       url: p.url ?? "",
-      bullets: p.bullets ?? [],
+      bullets: (p.bullets ?? []).map((b) => b.content),
     })),
     education: (cv.education ?? []).map((ed) => ({
       institution: ed.institution ?? "",
@@ -101,11 +109,24 @@ export function toTypstPayload(cv: CvData): TypstCvPayload {
       name: s.name ?? "",
       category: s.category ?? "",
     })),
-    achievements: (cv.achievements ?? []).map((a) => ({
-      title: a.title ?? "",
-      issuer: a.issuer ?? "",
-      date: a.date ?? "",
-      description: a.description ?? "",
+    // `templates/classic.typ` reads the full credential field set directly
+    // — `kind`/`issuedAt`/`expiresAt`/`credentialId`/`credentialUrl` — no
+    // more best-effort `date` folding (career-bank-restructure Phase 9,
+    // finishing the minimal rename fallback Phase 2's schema reshape left
+    // in place).
+    credentials: (cv.credentials ?? []).map((c) => ({
+      kind: c.kind ?? "",
+      name: c.name ?? "",
+      issuer: c.issuer ?? "",
+      issuedAt: c.issuedAt ?? "",
+      expiresAt: c.expiresAt ?? "",
+      credentialId: c.credentialId ?? "",
+      credentialUrl: c.credentialUrl ?? "",
+      description: c.description ?? "",
+    })),
+    languages: (cv.languages ?? []).map((l) => ({
+      name: l.name ?? "",
+      level: l.level ?? "",
     })),
     references: (cv.references ?? []).map((r) => ({
       name: r.name ?? "",

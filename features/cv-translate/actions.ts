@@ -4,15 +4,18 @@ import { eq } from "drizzle-orm"
 import { createId } from "@paralleldrive/cuid2"
 import type { BatchItem } from "drizzle-orm/batch"
 import { db } from "@/db"
-import { achievement, cv, education, reference } from "@/db/schema"
+import { cv, cvCredential, cvEducation, cvReference } from "@/db/schema"
 import { getSessionUserId, findOwnedCv } from "@/features/cv/ownership"
-import { buildCvSectionQueries } from "@/features/cv/persist-sections"
+import {
+  buildCvSectionQueries,
+  flattenSectionBatch,
+} from "@/features/cv/persist-sections"
 import { resolveModelForUser } from "@/lib/ai/get-user-model"
 import { translateAiError } from "@/lib/ai/errors"
 import { TranslationError } from "@/lib/translate/errors"
 import { createLlmTranslationProvider } from "@/lib/translate/providers/llm.provider"
 import type { Result } from "@/lib/result"
-import type { CvData, EducationItem } from "@/schemas/cv.schema"
+import type { CredentialKind, CvData, EducationItem } from "@/schemas/cv.schema"
 import {
   cvTranslationReviewSchema,
   translateSegmentsInputSchema,
@@ -104,8 +107,8 @@ export async function translateCvSegments(
  * atomic unit available).
  *
  * Deliberately NOT a wrapper around `createCvFromAdaptation` (design D6):
- * that action demands a 100+ char `jobPostingText` and writes a
- * `cv_adaptation` row, which has no meaning for a translation and would
+ * that action demands a 100+ char `jobPostingText` and writes an
+ * `adaptation` row, which has no meaning for a translation and would
  * poison `/applications`. Structurally this is `createCvFromImport` +
  * adapt's D11/D14 source-of-truth rules, minus the satellite-table insert —
  * translation has no provenance table of its own by design (no "job
@@ -138,8 +141,8 @@ export async function createCvFromTranslation(
   // own rows, never trusted from the client payload.
   const sourceEducationRows = await db
     .select()
-    .from(education)
-    .where(eq(education.cvId, sourceCvId))
+    .from(cvEducation)
+    .where(eq(cvEducation.cvId, sourceCvId))
   const finalEducation: EducationItem[] = sourceEducationRows.map((row) => ({
     id: row.id,
     institution: row.institution,
@@ -148,22 +151,26 @@ export async function createCvFromTranslation(
     endDate: row.endDate,
   }))
 
-  // Achievements and references: no translation channel and no review UI,
+  // Credentials and references: no translation channel and no review UI,
   // so every source row is carried through verbatim — same reasoning as
   // `createCvFromAdaptation`.
-  const [sourceAchievementRows, sourceReferenceRows] = await Promise.all([
-    db.select().from(achievement).where(eq(achievement.cvId, sourceCvId)),
-    db.select().from(reference).where(eq(reference.cvId, sourceCvId)),
+  const [sourceCredentialRows, sourceReferenceRows] = await Promise.all([
+    db.select().from(cvCredential).where(eq(cvCredential.cvId, sourceCvId)),
+    db.select().from(cvReference).where(eq(cvReference.cvId, sourceCvId)),
   ])
 
   const finalDraft: CvData = {
     ...draft,
     education: finalEducation,
-    achievements: sourceAchievementRows.map((row) => ({
+    credentials: sourceCredentialRows.map((row) => ({
       id: row.id,
-      title: row.title,
+      kind: row.kind as CredentialKind,
+      name: row.name,
       issuer: row.issuer,
-      date: row.date,
+      issuedAt: row.issuedAt,
+      expiresAt: row.expiresAt,
+      credentialId: row.credentialId,
+      credentialUrl: row.credentialUrl,
       description: row.description,
     })),
     references: sourceReferenceRows.map((row) => ({
@@ -191,9 +198,11 @@ export async function createCvFromTranslation(
       email: owned.email,
       phone: owned.phone,
       location: owned.location,
+      linkedinUrl: owned.linkedinUrl,
+      websiteUrl: owned.websiteUrl,
       summary: draft.summary ?? null,
     }),
-    ...buildCvSectionQueries(id, finalDraft),
+    ...flattenSectionBatch(buildCvSectionQueries(id, finalDraft)),
   ]
 
   await db.batch(queries as [BatchItem<"pg">, ...BatchItem<"pg">[]])

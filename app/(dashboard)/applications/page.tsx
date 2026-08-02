@@ -8,7 +8,7 @@ import { AdaptationHistory } from "@/features/cv-adapt/adaptation-history"
 /**
  * Application history — one entry per CV adapted to a job posting.
  *
- * Reads `cv_adaptation`, which `createCvFromAdaptation` had been writing
+ * Reads `adaptation`, which `createCvFromAdaptation` had been writing
  * since Phase 5 with nothing on the other end: the posting and the lineage
  * were stored on every adaptation and never surfaced anywhere in the UI.
  * This page is that missing read side.

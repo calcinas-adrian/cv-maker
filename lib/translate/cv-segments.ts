@@ -55,7 +55,7 @@ export function collectCvSegments(
   cv.experiences.forEach((experience, index) => {
     add({ kind: "experience.role", index }, experience.role)
     ;(experience.bullets ?? []).forEach((bullet, bulletIndex) => {
-      add({ kind: "experience.bullet", index, bulletIndex }, bullet)
+      add({ kind: "experience.bullet", index, bulletIndex }, bullet.content)
     })
   })
 
@@ -63,7 +63,7 @@ export function collectCvSegments(
     add({ kind: "project.name", index }, project.name)
     add({ kind: "project.description", index }, project.description)
     ;(project.bullets ?? []).forEach((bullet, bulletIndex) => {
-      add({ kind: "project.bullet", index, bulletIndex }, bullet)
+      add({ kind: "project.bullet", index, bulletIndex }, bullet.content)
     })
   })
 
@@ -126,8 +126,13 @@ export function applyCvSegments(
         }
         case "experience.bullet": {
           const item = experiences[target.index]
-          if (item?.bullets && target.bulletIndex in item.bullets) {
-            item.bullets[target.bulletIndex] = text
+          const bullet = item?.bullets?.[target.bulletIndex]
+          // Only `content` is replaced — `id`/`sourceMaterialId` survive a
+          // translation pass, unlike a hand-edited rewording (YAML
+          // provenance rule, Decision 5): translation is a mechanical
+          // language conversion of the SAME claim, not a new one.
+          if (item?.bullets && bullet) {
+            item.bullets[target.bulletIndex] = { ...bullet, content: text }
           }
           break
         }
@@ -143,8 +148,9 @@ export function applyCvSegments(
         }
         case "project.bullet": {
           const item = projects[target.index]
-          if (item?.bullets && target.bulletIndex in item.bullets) {
-            item.bullets[target.bulletIndex] = text
+          const bullet = item?.bullets?.[target.bulletIndex]
+          if (item?.bullets && bullet) {
+            item.bullets[target.bulletIndex] = { ...bullet, content: text }
           }
           break
         }

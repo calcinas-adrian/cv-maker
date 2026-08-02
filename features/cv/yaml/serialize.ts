@@ -1,21 +1,26 @@
 import { parse, stringify, YAMLParseError } from "yaml"
-import { cvDataSchema, type CvData } from "@/schemas/cv.schema"
+import type { CvData } from "@/schemas/cv.schema"
+import { toYamlView, yamlCvSchema, type YamlCvData } from "./projection"
 
 /**
  * YAML<->CvData serialization for the YAML editor view (5.3/5.4).
  *
  * `validateYaml` is the single source of truth for "is this YAML a valid
- * CvData" — both the CodeMirror inline linter (`yaml-editor.tsx`) and the
+ * document" — both the CodeMirror inline linter (`yaml-editor.tsx`) and the
  * debounced commit path (`yaml-panel.tsx`) call it, so they can never
- * disagree about what counts as valid.
+ * disagree about what counts as valid. It validates against `yamlCvSchema`
+ * (career-bank-restructure Decision 5), NOT `cvDataSchema`: bullets in the
+ * YAML view are plain strings, so it returns `YamlCvData`. The commit path
+ * is responsible for turning that into `CvData` via `fromYamlView`, which
+ * needs the store's current draft to reconcile bullet provenance.
  */
 
 export function cvDataToYaml(data: CvData): string {
-  return stringify(data)
+  return stringify(toYamlView(data))
 }
 
 export type YamlValidationResult =
-  | { ok: true; data: CvData }
+  | { ok: true; data: YamlCvData }
   // `from`/`to` are character offsets into the source when known (YAML
   // syntax errors carry a precise position); omitted for schema-validation
   // failures, where the offending value has no single source location to
@@ -34,7 +39,7 @@ export function validateYaml(source: string): YamlValidationResult {
     return { ok: false, error: "YAML inválido" }
   }
 
-  const result = cvDataSchema.safeParse(parsed ?? {})
+  const result = yamlCvSchema.safeParse(parsed ?? {})
   if (!result.success) {
     const issue = result.error.issues[0]
     const path = issue?.path.join(".")

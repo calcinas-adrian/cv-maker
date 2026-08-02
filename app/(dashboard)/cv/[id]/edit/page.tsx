@@ -1,27 +1,23 @@
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { asc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
-import { db } from "@/db"
-import {
-  achievement,
-  education,
-  experience,
-  project,
-  reference,
-  skill,
-} from "@/db/schema"
-import { DEFAULT_THEME, type CvData } from "@/schemas/cv.schema"
+import { DEFAULT_THEME } from "@/schemas/cv.schema"
 import { findOwnedCv } from "@/features/cv/ownership"
+import { getCvDraft } from "@/features/cv/actions"
 import { CvEditor } from "@/features/cv/cv-editor"
 
 /**
- * Reads directly via `db` rather than through the `getCvDraft` server
- * action: this page additionally needs the row's `updatedAt` for the
- * editor's optimistic-concurrency check, which `getCvDraft`'s contracted
- * `Result<CvData>` return type doesn't carry. `getCvDraft` still exists in
- * `features/cv/actions.ts` per spec and is used internally by
- * `saveVersion` to build snapshots.
+ * `updatedAt` (for the editor's optimistic-concurrency check) comes from
+ * `findOwnedCv`'s own row — it is fetched separately from `getCvDraft`,
+ * whose contracted `Result<CvData>` return type doesn't carry it.
+ *
+ * Previously this page duplicated `getCvDraft`'s read logic inline against
+ * the old flat table names (`experience`, `project`, `education`, `skill`,
+ * `achievement`, `reference`), which the `cv_experience`/`cv_bullet`/etc.
+ * schema rewrite broke. It now calls `getCvDraft` directly instead of
+ * re-duplicating that query — the extra `findOwnedCv` lookup inside
+ * `getCvDraft` is a second round trip, not a second copy of the "which CVs
+ * may this user see" rule.
  */
 export default async function EditCvPage({
   params,
@@ -54,131 +50,12 @@ export default async function EditCvPage({
     notFound()
   }
 
-  const [experiences, projects, educations, skills, achievements, references] =
-    await Promise.all([
-      db
-        .select({
-          id: experience.id,
-          sortOrder: experience.sortOrder,
-          company: experience.company,
-          role: experience.role,
-          startDate: experience.startDate,
-          endDate: experience.endDate,
-          bullets: experience.bullets,
-        })
-        .from(experience)
-        .where(eq(experience.cvId, id))
-        .orderBy(asc(experience.sortOrder)),
-      db
-        .select({
-          id: project.id,
-          sortOrder: project.sortOrder,
-          name: project.name,
-          description: project.description,
-          url: project.url,
-          bullets: project.bullets,
-        })
-        .from(project)
-        .where(eq(project.cvId, id))
-        .orderBy(asc(project.sortOrder)),
-      db
-        .select({
-          id: education.id,
-          sortOrder: education.sortOrder,
-          institution: education.institution,
-          degree: education.degree,
-          startDate: education.startDate,
-          endDate: education.endDate,
-        })
-        .from(education)
-        .where(eq(education.cvId, id))
-        .orderBy(asc(education.sortOrder)),
-      db
-        .select({
-          id: skill.id,
-          sortOrder: skill.sortOrder,
-          name: skill.name,
-          category: skill.category,
-        })
-        .from(skill)
-        .where(eq(skill.cvId, id))
-        .orderBy(asc(skill.sortOrder)),
-      db
-        .select({
-          id: achievement.id,
-          sortOrder: achievement.sortOrder,
-          title: achievement.title,
-          issuer: achievement.issuer,
-          date: achievement.date,
-          description: achievement.description,
-        })
-        .from(achievement)
-        .where(eq(achievement.cvId, id))
-        .orderBy(asc(achievement.sortOrder)),
-      db
-        .select({
-          id: reference.id,
-          sortOrder: reference.sortOrder,
-          name: reference.name,
-          role: reference.role,
-          company: reference.company,
-          email: reference.email,
-          phone: reference.phone,
-        })
-        .from(reference)
-        .where(eq(reference.cvId, id))
-        .orderBy(asc(reference.sortOrder)),
-    ])
-
-  const initialData: CvData = {
-    fullName: cvRow.fullName ?? undefined,
-    email: cvRow.email ?? undefined,
-    phone: cvRow.phone ?? undefined,
-    location: cvRow.location ?? undefined,
-    summary: cvRow.summary ?? undefined,
-    experiences: experiences.map((e) => ({
-      id: e.id,
-      company: e.company,
-      role: e.role,
-      startDate: e.startDate,
-      endDate: e.endDate,
-      bullets: e.bullets,
-    })),
-    projects: projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description ?? undefined,
-      url: p.url,
-      bullets: p.bullets,
-    })),
-    education: educations.map((ed) => ({
-      id: ed.id,
-      institution: ed.institution,
-      degree: ed.degree,
-      startDate: ed.startDate,
-      endDate: ed.endDate,
-    })),
-    skills: skills.map((s) => ({
-      id: s.id,
-      name: s.name,
-      category: s.category,
-    })),
-    achievements: achievements.map((a) => ({
-      id: a.id,
-      title: a.title,
-      issuer: a.issuer,
-      date: a.date,
-      description: a.description,
-    })),
-    references: references.map((r) => ({
-      id: r.id,
-      name: r.name,
-      role: r.role,
-      company: r.company,
-      email: r.email,
-      phone: r.phone,
-    })),
+  const draftResult = await getCvDraft(id)
+  if (!draftResult.ok) {
+    notFound()
   }
+
+  const initialData = draftResult.data
 
   return (
     // Keying on `id` alone forces a clean unmount+remount of `CvEditor` on

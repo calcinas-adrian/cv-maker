@@ -10,8 +10,8 @@ import type { CvData, CvTheme } from "@/schemas/cv.schema"
 import { AutosaveIndicator } from "./autosave-indicator"
 import { CvEditorSkeleton } from "./cv-editor-skeleton"
 import { useEditorStore } from "./editor-store"
-import { AchievementSection } from "./sections/achievement-section"
 import { BasicInfoCard } from "./sections/basic-info-card"
+import { CredentialSection } from "./sections/credential-section"
 import { EducationSection } from "./sections/education-section"
 import { ExperienceSection } from "./sections/experience-section"
 import { ProjectSection } from "./sections/project-section"
@@ -174,7 +174,7 @@ export function CvEditor({
           <ProjectSection cvId={cvId} />
           <EducationSection />
           <SkillSection />
-          <AchievementSection />
+          <CredentialSection />
           <ReferenceSection />
           <VersionHistory cvId={cvId} />
         </div>

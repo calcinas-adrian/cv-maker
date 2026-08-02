@@ -34,7 +34,8 @@
 #let projects = data.at("projects", default: ())
 #let education = data.at("education", default: ())
 #let skills = data.at("skills", default: ())
-#let achievements = data.at("achievements", default: ())
+#let languages = data.at("languages", default: ())
+#let credentials = data.at("credentials", default: ())
 #let references = data.at("references", default: ())
 
 // -- Theme ---------------------------------------------------------------
@@ -259,19 +260,60 @@
   #par(skill-labels.join("  ·  "))
 ]
 
-// -- Achievements ----------------------------------------------------------
+// -- Languages ---------------------------------------------------------
 
-#if achievements.len() > 0 [
-  #section-title("Achievements")
-  #for item in achievements [
+// Same "join labelled entries with a middle dot" shape as Skills above —
+// deliberately not a bulleted list, to keep both compact single-line
+// sections visually consistent.
+#let language-labels = (
+  languages
+    .map(l => {
+      let name = nz(l.at("name", default: ""))
+      let level = nz(l.at("level", default: ""))
+      if name == "" { "" } else if level != "" { name + " (" + level + ")" } else { name }
+    })
+    .filter(s => s != "")
+)
+
+#if language-labels.len() > 0 [
+  #section-title("Languages")
+  #par(language-labels.join("  ·  "))
+]
+
+// -- Credentials ---------------------------------------------------------
+//
+// Certifications and awards, merged via `kind` (`schemas/cv.schema.ts`'s
+// `credentialItemSchema`, replacing the old flat `achievements` shape).
+// `issuedAt`/`expiresAt` reuse `fmt-range` exactly like every other
+// date-ranged section; `kind`/`credentialId`/`credentialUrl` join the
+// existing "small gray meta line" pattern already used by References'
+// contact line and the page header's contact line, rather than inventing a
+// fourth `entry-header` slot only this section would use.
+#let credential-kind-label(kind) = (
+  if kind == "certification" { "Certification" }
+  else if kind == "award" { "Award" }
+  else { "" }
+)
+
+#if credentials.len() > 0 [
+  #section-title("Credentials")
+  #for item in credentials [
     #entry-header(
-      nz(item.at("title", default: "")),
+      nz(item.at("name", default: "")),
       nz(item.at("issuer", default: "")),
-      nz(item.at("date", default: "")),
+      fmt-range(nz(item.at("issuedAt", default: "")), nz(item.at("expiresAt", default: ""))),
     )
-    #let achievement-description = nz(item.at("description", default: ""))
-    #if achievement-description != "" [
-      #text(size: 9.5pt)[#achievement-description]
+    #let credential-description = nz(item.at("description", default: ""))
+    #if credential-description != "" [
+      #text(size: 9.5pt)[#credential-description]
+    ]
+    #let credential-meta = (
+      credential-kind-label(nz(item.at("kind", default: ""))),
+      nz(item.at("credentialId", default: "")),
+      nz(item.at("credentialUrl", default: "")),
+    ).filter(p => p != "")
+    #if credential-meta.len() > 0 [
+      #text(size: 9pt, fill: gray)[#credential-meta.join("  ·  ")]
     ]
     #v(0.35em)
   ]

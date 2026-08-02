@@ -1,1 +1,0 @@
-ALTER TABLE "cv_adaptation" ADD COLUMN "adaptation_notes" text;

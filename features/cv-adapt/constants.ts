@@ -9,7 +9,7 @@ export const MIN_JOB_POSTING_CHARS = 200
 export const MAX_MATERIAL_CHARS = 40_000
 
 /**
- * Storage cap for `cv_adaptation.adaptation_notes`. The prompt asks for 2-3
+ * Storage cap for `adaptation.adaptation_notes`. The prompt asks for 2-3
  * sentences, so this is roughly ten times the expected size — it exists to
  * bound what a client can push into the column, not to shape the copy.
  *
@@ -23,6 +23,14 @@ export const MAX_MATERIAL_CHARS = 40_000
 export const MAX_ADAPTATION_NOTES_CHARS = 2_000
 
 export const DEFAULT_ADAPTED_CV_TITLE = "CV adaptado"
+
+/**
+ * Refusal message for a bank-origin adaptation with nothing to adapt FROM.
+ * Deliberately actionable rather than apologetic: the fix is always the same
+ * one gesture, so the message names it.
+ */
+export const EMPTY_BANK_ERROR =
+  "Tu banco todavía no tiene material para adaptar. Importá tu CV en PDF o conectá GitHub y probá de nuevo."
 
 export const JOB_POSTING_TOO_LONG_ERROR = `El aviso supera los ${MAX_JOB_POSTING_CHARS} caracteres. Pegá solo la descripción del puesto y los requisitos.`
 

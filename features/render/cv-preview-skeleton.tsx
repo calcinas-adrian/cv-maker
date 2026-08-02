@@ -62,7 +62,7 @@ export function DocumentSkeleton({
   projectCount,
   educationCount,
   skillCount,
-  achievementCount,
+  credentialCount,
   referenceCount,
   className,
 }: {
@@ -70,7 +70,7 @@ export function DocumentSkeleton({
   projectCount: number
   educationCount: number
   skillCount: number
-  achievementCount: number
+  credentialCount: number
   referenceCount: number
   className?: string
 }) {
@@ -96,7 +96,7 @@ export function DocumentSkeleton({
       <SectionSkeleton titleClassName="w-24" count={projectCount} />
       <SectionSkeleton titleClassName="w-32" count={educationCount} />
       <SectionSkeleton titleClassName="w-20" count={skillCount} />
-      <SectionSkeleton titleClassName="w-28" count={achievementCount} />
+      <SectionSkeleton titleClassName="w-28" count={credentialCount} />
       <SectionSkeleton titleClassName="w-24" count={referenceCount} />
     </div>
   )

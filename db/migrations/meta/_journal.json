@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783487421892,
-      "tag": "0000_redundant_marvex",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783488455842,
-      "tag": "0001_sticky_piledriver",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783490700966,
-      "tag": "0002_spooky_leopardon",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784506273438,
-      "tag": "0003_light_tiger_shark",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785078869301,
-      "tag": "0004_green_william_stryker",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1785099409912,
-      "tag": "0005_lyrical_the_hood",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1785116072309,
-      "tag": "0006_mushy_ben_grimm",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1785158130082,
-      "tag": "0007_soft_delete",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1785185706534,
-      "tag": "0008_adaptation_notes",
+      "when": 1785647402467,
+      "tag": "0000_slippery_ricochet",
       "breakpoints": true
     }
   ]

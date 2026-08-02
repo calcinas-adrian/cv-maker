@@ -15,13 +15,35 @@ import { z } from "zod"
 
 const dateStringSchema = z.string().nullable().optional()
 
+/**
+ * One itemized bullet under an experience or a project. `id` is REACT
+ * IDENTITY, not a database primary key — it is never persisted as-is; it
+ * exists so a bullet row is addressable for reorder/edit/delete and for
+ * "save to bank" without re-keying the whole list on every render. See
+ * `persist-sections.ts`'s docstring: "client-supplied item ids are UI-only
+ * and never persisted" applies here too.
+ *
+ * `sourceMaterialId` is the ACTUAL provenance pointer, persisted onto
+ * `cv_bullet.source_material_id` (no FK — see `db/schema.ts`). Null means
+ * "hand-written, never linked to the bank". It is nullable/optional/
+ * defaulted so a freshly typed bullet, an imported one, and one hydrated
+ * from the database all satisfy this schema without special-casing.
+ */
+export const cvBulletSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  sourceMaterialId: z.string().nullable().optional().default(null),
+})
+
+export type CvBullet = z.infer<typeof cvBulletSchema>
+
 export const experienceItemSchema = z.object({
   id: z.string(),
   company: z.string().optional(),
   role: z.string().optional(),
   startDate: dateStringSchema,
   endDate: dateStringSchema,
-  bullets: z.array(z.string()).optional().default([]),
+  bullets: z.array(cvBulletSchema).optional().default([]),
 })
 
 export const projectItemSchema = z.object({
@@ -29,7 +51,7 @@ export const projectItemSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   url: z.string().nullable().optional(),
-  bullets: z.array(z.string()).optional().default([]),
+  bullets: z.array(cvBulletSchema).optional().default([]),
 })
 
 export const educationItemSchema = z.object({
@@ -46,12 +68,30 @@ export const skillItemSchema = z.object({
   category: z.string().nullable().optional(),
 })
 
-export const achievementItemSchema = z.object({
+// Certifications and awards, merged via `kind` — mirrors `bank_credential`
+// (`db/schema.ts`). Replaces the old flat `achievementItemSchema`:
+// `title` -> `name`, `date` -> `issuedAt`/`expiresAt`, plus `kind`,
+// `credentialId`, `credentialUrl`.
+export const credentialKinds = ["certification", "award"] as const
+export const credentialKindSchema = z.enum(credentialKinds)
+export type CredentialKind = z.infer<typeof credentialKindSchema>
+
+export const credentialItemSchema = z.object({
   id: z.string(),
-  title: z.string().optional(),
+  kind: credentialKindSchema.optional(),
+  name: z.string().optional(),
   issuer: z.string().nullable().optional(),
-  date: dateStringSchema,
+  issuedAt: dateStringSchema,
+  expiresAt: dateStringSchema,
+  credentialId: z.string().nullable().optional(),
+  credentialUrl: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+})
+
+export const languageItemSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  level: z.string().nullable().optional(),
 })
 
 export const referenceItemSchema = z.object({
@@ -68,6 +108,8 @@ export const cvDataSchema = z.object({
   email: z.string().optional(),
   phone: z.string().optional(),
   location: z.string().optional(),
+  linkedinUrl: z.string().nullable().optional(),
+  websiteUrl: z.string().nullable().optional(),
   summary: z.string().optional(),
   experiences: z.array(experienceItemSchema).optional().default([]),
   projects: z.array(projectItemSchema).optional().default([]),
@@ -80,7 +122,12 @@ export const cvDataSchema = z.object({
   // not (see `restoreVersion` in `features/cv/actions.ts`, which returns
   // `versionRow.snapshot` unparsed — the store tolerates a missing key
   // because every section selector falls back to its `EMPTY_*` constant).
-  achievements: z.array(achievementItemSchema).optional().default([]),
+  // This restructure ships against an EMPTY database (see
+  // `architecture/career-bank-migration-strategy`), so there are zero
+  // pre-existing snapshots to worry about here in practice, but the
+  // `.default([])` convention is kept for every future additive field.
+  credentials: z.array(credentialItemSchema).optional().default([]),
+  languages: z.array(languageItemSchema).optional().default([]),
   references: z.array(referenceItemSchema).optional().default([]),
 })
 
@@ -92,7 +139,8 @@ export type ExperienceItem = z.infer<typeof experienceItemSchema>
 export type ProjectItem = z.infer<typeof projectItemSchema>
 export type EducationItem = z.infer<typeof educationItemSchema>
 export type SkillItem = z.infer<typeof skillItemSchema>
-export type AchievementItem = z.infer<typeof achievementItemSchema>
+export type CredentialItem = z.infer<typeof credentialItemSchema>
+export type LanguageItem = z.infer<typeof languageItemSchema>
 export type ReferenceItem = z.infer<typeof referenceItemSchema>
 export type CvData = z.infer<typeof cvDataSchema>
 
