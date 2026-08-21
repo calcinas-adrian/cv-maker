@@ -10,7 +10,7 @@ function Bar({ className }: { className?: string }) {
 /**
  * Mirrors one section card: a title-shaped bar (in place of `CardTitle` +
  * its `CardAction` "Agregar" button) then a couple of item-row-shaped bars.
- * Same skeleton vocabulary as `settings/loading.tsx`'s `ProviderCardSkeleton`
+ * Same skeleton vocabulary as `ai-providers/loading.tsx`'s `ProviderCardSkeleton`
  * and the deleted `career-material/loading.tsx`'s `MaterialCardSkeleton`.
  */
 function SectionCardSkeleton() {
@@ -35,7 +35,7 @@ function SectionCardSkeleton() {
  */
 export default function BankLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+    <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-1.5">
         <Bar className="h-6 w-40" />
         <Bar className="h-3 w-full" />

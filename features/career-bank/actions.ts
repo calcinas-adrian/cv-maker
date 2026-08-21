@@ -1,7 +1,8 @@
 "use server"
 
-import { and, asc, eq, isNull, ne } from "drizzle-orm"
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm"
 import { createId } from "@paralleldrive/cuid2"
+import { APICallError, type LanguageModel } from "ai"
 import { z } from "zod"
 import { db } from "@/db"
 import {
@@ -12,6 +13,7 @@ import {
   bankLanguage,
   bankMaterial,
   bankMaterialVariant,
+  bankMemory,
   bankSkill,
 } from "@/db/schema"
 import {
@@ -22,6 +24,9 @@ import {
   bankLanguageInputSchema,
   bankMaterialInputSchema,
   bankSkillInputSchema,
+  MAX_MEMORY_RAW_TEXT_CHARS,
+  memoryCaptureInputSchema,
+  memoryDraftInputSchema,
 } from "@/schemas/bank.schema"
 import {
   findOwnedCredential,
@@ -29,6 +34,7 @@ import {
   findOwnedEngagement,
   findOwnedLanguage,
   findOwnedMaterial,
+  findOwnedMemory,
   findOwnedSkill,
   findOwnedVariant,
   findPersonalBank,
@@ -43,6 +49,16 @@ import {
   flattenBankImportBatch,
 } from "@/features/career-bank/build-bank-queries"
 import { computeSortOrderSwap } from "@/features/career-bank/reorder"
+import {
+  draftMemoryFromText,
+  refineMemoryDraft,
+} from "@/features/career-bank/ai-extract-memory"
+import { resolveModelForUser } from "@/lib/ai/get-user-model"
+import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
+import type {
+  MemoryDraftExtract,
+  MemoryRefineExtract,
+} from "@/schemas/memory-capture.schema"
 import type { BatchItem } from "drizzle-orm/batch"
 import type { Result } from "@/lib/result"
 
@@ -66,6 +82,7 @@ export type BankEducationRow = typeof bankEducation.$inferSelect
 export type BankCredentialRow = typeof bankCredential.$inferSelect
 export type BankLanguageRow = typeof bankLanguage.$inferSelect
 export type BankSkillRow = typeof bankSkill.$inferSelect
+export type BankMemoryRow = typeof bankMemory.$inferSelect
 
 export type BankMaterialWithVariants = BankMaterialRow & {
   variants: BankMaterialVariantRow[]
@@ -79,6 +96,7 @@ export type BankPageData = {
   credentials: BankCredentialRow[]
   languages: BankLanguageRow[]
   skills: BankSkillRow[]
+  memories: BankMemoryRow[]
 }
 
 /**
@@ -102,6 +120,7 @@ export async function getBankPage(): Promise<Result<BankPageData>> {
     credentials,
     languages,
     skills,
+    memories,
   ] = await Promise.all([
     db
       .select()
@@ -175,6 +194,13 @@ export async function getBankPage(): Promise<Result<BankPageData>> {
       .from(bankSkill)
       .where(and(eq(bankSkill.bankId, bankRow.id), isNull(bankSkill.deletedAt)))
       .orderBy(asc(bankSkill.sortOrder)),
+    db
+      .select()
+      .from(bankMemory)
+      .where(
+        and(eq(bankMemory.bankId, bankRow.id), isNull(bankMemory.deletedAt)),
+      )
+      .orderBy(desc(bankMemory.createdAt)),
   ])
 
   const variantsByMaterialId = new Map<string, BankMaterialVariantRow[]>()
@@ -197,6 +223,7 @@ export async function getBankPage(): Promise<Result<BankPageData>> {
       credentials,
       languages,
       skills,
+      memories,
     },
   }
 }
@@ -1534,6 +1561,228 @@ export async function moveSkill(
       .set({ sortOrder: b.sortOrder })
       .where(eq(bankSkill.id, b.id)),
   ] as [BatchItem<"pg">, ...BatchItem<"pg">[]])
+
+  return { ok: true, data: { id } }
+}
+
+// ---------------------------------------------------------------------------
+// Memories ("Memorias" — AI-assisted career achievement capture)
+// ---------------------------------------------------------------------------
+
+const clarifyingAnswerPairSchema = z.object({
+  question: z.string().max(500),
+  answer: z.string().trim().max(1000),
+})
+
+/**
+ * Wraps a `generateObject` call from `ai-extract-memory.ts` with the shared
+ * error discipline from `features/cv-adapt/actions.ts`'s `runAdaptation`:
+ * unwrap `RetryError`, log only the safe subset (never the raw error, which
+ * can carry `requestBodyValues`/`responseBody`, and never the api key), and
+ * translate into a `Result`.
+ */
+async function runMemoryExtraction<T>(
+  model: LanguageModel,
+  run: () => Promise<T>,
+): Promise<Result<T>> {
+  try {
+    const data = await run()
+    return { ok: true, data }
+  } catch (err) {
+    const cause = unwrapRetryError(err)
+    console.error(
+      "AI memory extraction failed",
+      typeof model === "string" ? model : model.provider,
+      APICallError.isInstance(cause)
+        ? cause.statusCode
+        : cause instanceof Error
+          ? cause.message
+          : "unknown error",
+    )
+    return {
+      ok: false,
+      error: translateAiError(err, {
+        logLabel: "AI memory extraction failed",
+        fallback: "No se pudo procesar la memoria con IA. Probá de nuevo.",
+      }),
+      code: "provider_error",
+    }
+  }
+}
+
+/**
+ * First AI call of the capture flow: drafts a bullet from the user's raw
+ * text and proposes 0-3 clarifying questions. Persists nothing — the
+ * capture sheet shows this to the user, who either answers the questions
+ * (`refineMemoryFromAnswers`) or, if there are none, goes straight to
+ * review.
+ */
+export async function extractMemoryDraft(
+  rawText: string,
+  providerModelId?: string,
+): Promise<Result<MemoryDraftExtract>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const parsed = memoryCaptureInputSchema.safeParse({ rawText })
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "El texto de la memoria es demasiado corto o demasiado largo",
+      code: "invalid_input",
+    }
+  }
+
+  const modelResult = await resolveModelForUser(userId, providerModelId)
+  if (!modelResult.ok) return modelResult
+
+  return runMemoryExtraction(modelResult.data.model, () =>
+    draftMemoryFromText(modelResult.data.model, parsed.data.rawText),
+  )
+}
+
+/**
+ * Second AI call of the capture flow, run only when the draft came back
+ * with at least one clarifying question. Persists nothing, same as
+ * `extractMemoryDraft` — the review step is what the user actually
+ * confirms.
+ */
+export async function refineMemoryFromAnswers(
+  rawText: string,
+  qa: { question: string; answer: string }[],
+  providerModelId?: string,
+): Promise<Result<MemoryRefineExtract>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const parsedRawText = memoryCaptureInputSchema.safeParse({ rawText })
+  if (!parsedRawText.success) {
+    return {
+      ok: false,
+      error: "El texto de la memoria es demasiado corto o demasiado largo",
+      code: "invalid_input",
+    }
+  }
+
+  const parsedQa = z.array(clarifyingAnswerPairSchema).max(3).safeParse(qa)
+  if (!parsedQa.success) {
+    return {
+      ok: false,
+      error: "Respuestas inválidas",
+      code: "invalid_input",
+    }
+  }
+
+  const modelResult = await resolveModelForUser(userId, providerModelId)
+  if (!modelResult.ok) return modelResult
+
+  return runMemoryExtraction(modelResult.data.model, () =>
+    refineMemoryDraft(
+      modelResult.data.model,
+      parsedRawText.data.rawText,
+      parsedQa.data,
+    ),
+  )
+}
+
+const captureMemoryInputSchema = memoryDraftInputSchema.extend({
+  rawText: z.string().trim().min(1).max(MAX_MEMORY_RAW_TEXT_CHARS),
+  questions: z.array(z.string().max(500)).max(3),
+  answers: z.record(z.string(), z.string().trim().max(1000)),
+  aiNotes: z.string().max(2000).nullable().optional(),
+})
+
+/**
+ * Persists a reviewed-and-confirmed memory: mints the `bank_material` +
+ * default `bank_material_variant` (the SAME `buildNewMaterialWithDefaultVariant`
+ * helper every other material-creation path in this domain uses — see its
+ * docstring in `build-bank-queries.ts`), then inserts the `bank_memory`
+ * provenance row pointing at the new material. `title` becomes the
+ * variant's `label` — there is no separate title column anywhere in this
+ * domain, and `label` already exists for exactly this "short note about
+ * this wording" purpose.
+ *
+ * One `db.batch` for both inserts — `db` is `drizzle-orm/neon-http`, where
+ * `db.transaction` throws and `db.batch` (one implicit transaction over one
+ * HTTP round trip) is the only atomic unit, same as every other multi-row
+ * create in this file.
+ */
+export async function captureMemory(
+  input: unknown,
+): Promise<Result<{ id: string; materialId: string }>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const parsed = captureMemoryInputSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Datos de la memoria inválidos",
+      code: "invalid_input",
+    }
+  }
+
+  const bankRow = await getOrCreatePersonalBank(userId)
+  const siblings = await db
+    .select({ id: bankMaterial.id })
+    .from(bankMaterial)
+    .where(
+      and(eq(bankMaterial.bankId, bankRow.id), isNull(bankMaterial.deletedAt)),
+    )
+
+  const built = buildNewMaterialWithDefaultVariant({
+    bankId: bankRow.id,
+    engagementId: null,
+    kind: "bullet",
+    sortOrder: siblings.length,
+    skillTags: parsed.data.skillTags,
+    content: parsed.data.bullet,
+    label: parsed.data.title,
+  })
+
+  const memoryId = createId()
+
+  await db.batch([
+    built.materialStatement,
+    built.variantStatement,
+    db.insert(bankMemory).values({
+      id: memoryId,
+      bankId: bankRow.id,
+      rawText: parsed.data.rawText,
+      clarifyingQuestions: parsed.data.questions,
+      clarifyingAnswers: parsed.data.answers,
+      aiNotes: parsed.data.aiNotes ?? null,
+      materialId: built.materialId,
+    }),
+  ] as [BatchItem<"pg">, ...BatchItem<"pg">[]])
+
+  return { ok: true, data: { id: memoryId, materialId: built.materialId } }
+}
+
+/**
+ * SOFT delete. Deliberately does NOT cascade to the `bank_material` the
+ * memory produced — see `db/schema.ts`'s note on `bank_memory.materialId`.
+ * A memory is the record of HOW a bullet was captured; removing that record
+ * says nothing about whether the bullet itself is still wanted.
+ */
+export async function deleteMemory(
+  id: string,
+): Promise<Result<{ id: string }>> {
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const bankRow = await getOrCreatePersonalBank(userId)
+  const owned = await findOwnedMemory(id, bankRow.id)
+  if (!owned) return { ok: false, error: "No encontrado", code: "not_found" }
+
+  await db
+    .update(bankMemory)
+    .set({ deletedAt: new Date() })
+    .where(eq(bankMemory.id, id))
 
   return { ok: true, data: { id } }
 }

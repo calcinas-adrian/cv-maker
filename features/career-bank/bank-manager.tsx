@@ -25,6 +25,7 @@ import { bankInputSchema, type BankInput } from "@/schemas/bank.schema"
 import { getBankPage, updateBankProfile, type BankPageData } from "./actions"
 import { EngagementSection } from "./sections/engagement-section"
 import { MaterialSection } from "./sections/material-section"
+import { MemorySection } from "./sections/memory-section"
 import { EducationSection } from "./sections/education-section"
 import { CredentialSection } from "./sections/credential-section"
 import { LanguageSection } from "./sections/language-section"
@@ -264,6 +265,11 @@ export function BankManager({ initialData }: { initialData: BankPageData }) {
       <MaterialSection
         materials={data.materials}
         engagements={data.engagements}
+        onChanged={refresh}
+      />
+      <MemorySection
+        memories={data.memories}
+        materials={data.materials}
         onChanged={refresh}
       />
       <EducationSection education={data.education} onChanged={refresh} />

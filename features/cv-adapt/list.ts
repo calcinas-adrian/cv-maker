@@ -1,104 +1,156 @@
-import "server-only"
-import { and, desc, eq, isNull } from "drizzle-orm"
+﻿import "server-only"
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm"
 import { db } from "@/db"
-import { adaptation, bank, cv } from "@/db/schema"
+import {
+  adaptation,
+  application,
+  applicationInterview,
+  applicationOffer,
+  bank,
+  cv,
+} from "@/db/schema"
+import type { ApplicationStatus } from "@/schemas/application.schema"
 
-/**
- * How much of the job posting travels with the LIST. Postings are capped at
- * 12k characters each (`MAX_JOB_POSTING_CHARS`), so shipping them whole
- * would put megabytes of RSC payload on a page most people open to scan
- * titles and dates. The full text is fetched on demand instead, by
- * `getAdaptationPosting`, when a row is actually expanded.
- */
-const POSTING_PREVIEW_CHARS = 220
-
-export type AdaptationListItem = {
+export type ApplicationListItem = {
   id: string
   createdAt: Date
-  postingPreview: string
-  /** True when the posting is longer than its preview — drives the "Ver aviso completo" affordance. */
-  postingTruncated: boolean
-  adaptationNotes: string | null
-  /** The CV this adaptation PRODUCED. Always present and always live. */
-  cvId: string
-  cvTitle: string
-  /**
-   * The bank this adaptation drew its corpus from. Null when the bank was
-   * later deleted (`adaptation.bank_id` is `set null`) OR the source CV had
-   * no bank at all when the adaptation ran (spec scenario "CV with no
-   * bank"). Since the career-bank restructure, adaptation reads ONLY the
-   * bank — there is no `sourceCvId` anymore to fall back to (see
-   * `architecture/adaptation-corpus-scope`), so this is "banco origen", not
-   * "CV origen".
-   */
-  source: { id: string; name: string } | null
+  status: ApplicationStatus
+  company: string | null
+  role: string | null
+  jobUrl: string | null
+  jobPostingText: string | null
+  contactName: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  appliedAt: string | null
+  followUpAt: string | null
+  notes: string | null
+  adaptation: {
+    id: string
+    cvId: string
+    cvTitle: string
+    sourceName: string | null
+    adaptationNotes: string | null
+  } | null
+  interviews: {
+    id: string
+    scheduledAt: string
+    kind: string
+    interviewer: string | null
+    location: string | null
+    notes: string | null
+  }[]
+  offer: {
+    receivedAt: string
+    compensation: string | null
+    currency: string | null
+    employmentType: string | null
+    responseDueAt: string | null
+    notes: string | null
+  } | null
 }
 
-/**
- * Application history: every CV the user generated from a job posting, newest
- * first.
- *
- * Reads the `adaptation` rows written by `createCvFromAdaptation`. Until
- * this query existed that table was write-only — the posting and the lineage
- * were being stored on every adaptation and never shown to anyone.
- *
- * Ownership is enforced through the ADAPTED cv row (`cv.userId`), the same
- * satellite pattern `features/cv/list.ts` uses: `adaptation` has no `userId`
- * of its own and is only ever reachable via a cv. Soft-deleted adapted CVs
- * drop out of the list entirely — a deleted CV is invisible everywhere in
- * the UI (see `features/cv/ownership.ts`), and its adaptation is not an
- * exception.
- */
-export async function listUserAdaptations(
-  userId: string,
-): Promise<AdaptationListItem[]> {
+export const APPLICATIONS_PER_PAGE = 25
+
+export async function listApplicationsPage(userId: string, page = 1) {
+  const safePage = Math.max(1, Math.floor(page))
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(application)
+    .where(and(eq(application.userId, userId), isNull(application.deletedAt)))
   const rows = await db
     .select({
-      id: adaptation.id,
-      createdAt: adaptation.createdAt,
-      jobPostingText: adaptation.jobPostingText,
+      id: application.id,
+      createdAt: application.createdAt,
+      status: application.status,
+      company: application.company,
+      role: application.role,
+      jobUrl: application.jobUrl,
+      manualPosting: application.jobPostingText,
+      contactName: application.contactName,
+      contactEmail: application.contactEmail,
+      contactPhone: application.contactPhone,
+      appliedAt: application.appliedAt,
+      followUpAt: application.followUpAt,
+      notes: application.notes,
+      adaptationId: adaptation.id,
+      adaptationPosting: adaptation.jobPostingText,
       adaptationNotes: adaptation.adaptationNotes,
       cvId: cv.id,
       cvTitle: cv.title,
-      bankId: bank.id,
-      bankName: bank.name,
+      sourceName: bank.name,
     })
-    .from(adaptation)
-    // INNER: no live adapted CV, no history row.
-    .innerJoin(cv, and(eq(cv.id, adaptation.cvId), isNull(cv.deletedAt)))
-    // LEFT: the bank may legitimately be gone, or never have existed for
-    // this adaptation. The `userId` and `deletedAt` conditions live in the
-    // JOIN rather than the WHERE on purpose — in a WHERE they would turn
-    // this into an inner join and silently drop every adaptation whose bank
-    // was deleted.
-    .leftJoin(
-      bank,
-      and(
-        eq(bank.id, adaptation.bankId),
-        eq(bank.userId, userId),
-        isNull(bank.deletedAt),
-      ),
-    )
-    .where(eq(cv.userId, userId))
-    .orderBy(desc(adaptation.createdAt))
-
-  return rows.map((row) => {
-    // Postings are pasted from job boards and arrive full of hard wrapping;
-    // collapsing whitespace is what makes a 220-character preview show 220
-    // characters of content instead of three ragged lines.
-    const flattened = row.jobPostingText.replace(/\s+/g, " ").trim()
-    return {
-      id: row.id,
-      createdAt: row.createdAt,
-      postingPreview: flattened.slice(0, POSTING_PREVIEW_CHARS),
-      postingTruncated: flattened.length > POSTING_PREVIEW_CHARS,
-      adaptationNotes: row.adaptationNotes,
-      cvId: row.cvId,
-      cvTitle: row.cvTitle,
-      source:
-        row.bankId && row.bankName
-          ? { id: row.bankId, name: row.bankName }
-          : null,
-    }
-  })
+    .from(application)
+    .leftJoin(adaptation, eq(adaptation.id, application.adaptationId))
+    .leftJoin(cv, and(eq(cv.id, adaptation.cvId), isNull(cv.deletedAt)))
+    .leftJoin(bank, and(eq(bank.id, adaptation.bankId), isNull(bank.deletedAt)))
+    .where(and(eq(application.userId, userId), isNull(application.deletedAt)))
+    .orderBy(desc(application.createdAt))
+    .limit(APPLICATIONS_PER_PAGE)
+    .offset((safePage - 1) * APPLICATIONS_PER_PAGE)
+  const ids = rows.map((row) => row.id)
+  const [interviews, offers] = ids.length
+    ? await Promise.all([
+        db
+          .select()
+          .from(applicationInterview)
+          .where(inArray(applicationInterview.applicationId, ids))
+          .orderBy(asc(applicationInterview.scheduledAt)),
+        db
+          .select()
+          .from(applicationOffer)
+          .where(inArray(applicationOffer.applicationId, ids)),
+      ])
+    : [[], []]
+  const interviewMap = new Map<string, typeof interviews>()
+  for (const interview of interviews)
+    interviewMap.set(interview.applicationId, [
+      ...(interviewMap.get(interview.applicationId) ?? []),
+      interview,
+    ])
+  const offerMap = new Map(offers.map((offer) => [offer.applicationId, offer]))
+  const items: ApplicationListItem[] = rows.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt,
+    status: row.status as ApplicationStatus,
+    company: row.company,
+    role: row.role,
+    jobUrl: row.jobUrl,
+    jobPostingText: row.adaptationPosting ?? row.manualPosting,
+    contactName: row.contactName,
+    contactEmail: row.contactEmail,
+    contactPhone: row.contactPhone,
+    appliedAt: row.appliedAt,
+    followUpAt: row.followUpAt,
+    notes: row.notes,
+    adaptation:
+      row.adaptationId && row.cvId && row.cvTitle
+        ? {
+            id: row.adaptationId,
+            cvId: row.cvId,
+            cvTitle: row.cvTitle,
+            sourceName: row.sourceName,
+            adaptationNotes: row.adaptationNotes,
+          }
+        : null,
+    interviews: interviewMap.get(row.id) ?? [],
+    offer: offerMap.get(row.id) ?? null,
+  }))
+  return {
+    items,
+    page: safePage,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / APPLICATIONS_PER_PAGE)),
+  }
 }
+
+export async function listApplications(
+  userId: string,
+): Promise<ApplicationListItem[]> {
+  const { items } = await listApplicationsPage(userId)
+  return items
+}
+
+/** Compatibility alias for the page while application tracking replaces adaptation history. */
+export const listUserAdaptations = listApplications
+export type AdaptationListItem = ApplicationListItem

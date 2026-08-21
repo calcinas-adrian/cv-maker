@@ -15,7 +15,16 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getAdaptationPosting } from "./actions"
-import type { AdaptationListItem } from "./list"
+type AdaptationListItem = {
+  id: string
+  cvId: string
+  cvTitle: string
+  createdAt: Date
+  source: { name: string } | null
+  adaptationNotes: string | null
+  postingPreview: string
+  postingTruncated: boolean
+}
 
 /**
  * Pinned locale AND timeZone, deliberately — not `toLocaleDateString()`.

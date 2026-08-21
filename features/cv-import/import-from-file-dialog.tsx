@@ -372,7 +372,10 @@ export function ImportFromFileDialog() {
                 <AiRunPreflight
                   rows={[
                     { label: "Archivo", value: pickedFile.name },
-                    { label: "Tamaño", value: formatFileSize(pickedFile.size) },
+                    {
+                      label: "Tamaño",
+                      value: formatFileSize(pickedFile.size),
+                    },
                     {
                       label: "Modelo",
                       value: defaultModelLabel ?? "Tu modelo por defecto",
@@ -529,8 +532,8 @@ export function ImportFromFileDialog() {
               {step.code === "provider_not_configured" ? (
                 <p className="text-sm">
                   {step.message}{" "}
-                  <Link href="/settings" className="underline">
-                    Ir a Ajustes
+                  <Link href="/ai-providers" className="underline">
+                    Configurar proveedor de IA
                   </Link>
                 </p>
               ) : (

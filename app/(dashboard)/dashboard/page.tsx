@@ -37,7 +37,7 @@ export default async function DashboardPage() {
 
   if (stage === "empty-bank") {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+      <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 rounded-xl border p-6">
           <h1 className="text-lg font-medium">Empezá por traer tu material</h1>
           <p className="text-muted-foreground text-sm">
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
 
   if (stage === "bank-ready") {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+      <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 rounded-xl border p-6">
           <h1 className="text-lg font-medium">Tu banco ya tiene material</h1>
           <p className="text-muted-foreground text-sm">
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+    <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-medium">Tus CVs</h1>
         <div className="flex items-center gap-2">

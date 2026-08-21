@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { href: "/dashboard", label: "Tus CVs" },
   { href: "/applications", label: "Postulaciones" },
   { href: "/bank", label: "Tu banco" },
-  { href: "/settings", label: "Proveedores de IA" },
+  { href: "/ai-providers", label: "Proveedores de IA" },
 ]
 
 export function DashboardNav() {
@@ -21,7 +21,7 @@ export function DashboardNav() {
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   // `/dashboard` is the root of the guided flow — every other route under
-  // `(dashboard)` (settings, the CV editor) gets an explicit "Volver" back
+  // `(dashboard)` (AI providers, the CV editor) gets an explicit "Volver" back
   // to it instead of the brand mark, so navigating back never depends on
   // browser history.
   const isRoot = pathname === "/dashboard"
@@ -34,30 +34,36 @@ export function DashboardNav() {
   }
 
   return (
-    <header className="border-border bg-background sticky top-0 z-10 flex h-[52px] w-full items-center justify-between gap-4 border-b px-4 sm:px-6">
-      {isRoot ? (
-        <Link
-          href="/dashboard"
-          className="text-base font-semibold tracking-tight"
-        >
-          CV·AI
-        </Link>
-      ) : (
-        <Button type="button" variant="ghost" size="sm" asChild>
-          <Link href="/dashboard">
-            <ArrowLeftIcon data-icon="inline-start" />
-            Volver
+    <header className="border-border bg-background sticky top-0 z-10 flex w-full flex-col border-b sm:h-[52px] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+      <div className="flex h-[52px] w-full shrink-0 items-center justify-between gap-3 px-4 sm:w-auto sm:px-0">
+        {isRoot ? (
+          <Link
+            href="/dashboard"
+            className="text-base font-semibold tracking-tight"
+          >
+            CV·AI
           </Link>
-        </Button>
-      )}
+        ) : (
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <Link href="/dashboard">
+              <ArrowLeftIcon data-icon="inline-start" />
+              Volver
+            </Link>
+          </Button>
+        )}
+      </div>
 
-      <nav className="flex items-center gap-2">
+      <nav
+        aria-label="Navegación principal"
+        className="flex w-full [scrollbar-width:none] items-center gap-2 overflow-x-auto border-t px-4 py-2 sm:w-auto sm:border-0 sm:px-0 sm:py-0"
+      >
         {NAV_LINKS.map((link) => (
           <Button
             key={link.href}
             type="button"
             variant={pathname === link.href ? "default" : "outline"}
             size="sm"
+            className="shrink-0"
             asChild
           >
             <Link href={link.href}>{link.label}</Link>
@@ -67,13 +73,16 @@ export function DashboardNav() {
           type="button"
           variant="outline"
           size="sm"
+          className="hidden shrink-0 sm:inline-flex"
           disabled={isSigningOut}
           onClick={handleSignOut}
         >
           <LogOutIcon data-icon="inline-start" />
           Cerrar sesión
         </Button>
-        <ThemeToggle />
+        <span className="ml-auto shrink-0 sm:ml-0">
+          <ThemeToggle />
+        </span>
       </nav>
     </header>
   )

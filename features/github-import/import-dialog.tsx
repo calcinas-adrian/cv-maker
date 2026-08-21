@@ -544,8 +544,8 @@ export function ImportFromGithubDialog({ cvId }: { cvId: string }) {
               {step.code === "provider_not_configured" ? (
                 <p className="text-sm">
                   {step.message}{" "}
-                  <Link href="/settings" className="underline">
-                    Ir a Ajustes
+                  <Link href="/ai-providers" className="underline">
+                    Configurar proveedor de IA
                   </Link>
                 </p>
               ) : (

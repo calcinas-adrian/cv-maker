@@ -28,7 +28,7 @@ export default async function BankPage() {
     result.data.materials.length > 0 || result.data.engagements.length > 0
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+    <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-3">
         <div>
           <h1 className="text-lg font-medium">Tu banco</h1>

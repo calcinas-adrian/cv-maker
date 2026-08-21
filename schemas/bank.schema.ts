@@ -157,3 +157,38 @@ export type BankInput = z.infer<typeof bankInputSchema>
 export const importDestinations = ["bank", "cv_only"] as const
 export const importDestinationSchema = z.enum(importDestinations)
 export type ImportDestination = z.infer<typeof importDestinationSchema>
+
+/**
+ * "Memorias" capture flow (`features/career-bank/memory-capture-sheet.tsx`).
+ * The raw text is validated with the same length-cap discipline as
+ * `MIN_JOB_POSTING_CHARS`/`MAX_JOB_POSTING_CHARS` in `features/cv-adapt/
+ * constants.ts`: too short and a paid AI call would run on nothing, too long
+ * and it is no longer "one achievement" — the minimum also functions as the
+ * "is this worth clarifying questions" floor on the client-side length hint.
+ */
+export const MIN_MEMORY_RAW_TEXT_CHARS = 20
+export const MAX_MEMORY_RAW_TEXT_CHARS = 4000
+
+export const memoryCaptureInputSchema = z.object({
+  rawText: z
+    .string()
+    .trim()
+    .min(MIN_MEMORY_RAW_TEXT_CHARS)
+    .max(MAX_MEMORY_RAW_TEXT_CHARS),
+})
+
+export type MemoryCaptureInput = z.infer<typeof memoryCaptureInputSchema>
+
+/**
+ * The reviewed-and-confirmed draft shape the user edits before it is saved
+ * as a `bank_material` — `title` becomes the new material's default
+ * variant `label`, `bullet` becomes its `content`. There is no `id` here:
+ * every memory capture mints a brand-new material, it never updates one.
+ */
+export const memoryDraftInputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  bullet: z.string().trim().min(3).max(2000),
+  skillTags: z.array(z.string().max(40)).max(20),
+})
+
+export type MemoryDraftInput = z.infer<typeof memoryDraftInputSchema>

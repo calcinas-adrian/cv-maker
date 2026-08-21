@@ -7,6 +7,7 @@ import type { BatchItem } from "drizzle-orm/batch"
 import { db } from "@/db"
 import {
   adaptation,
+  application,
   bankCredential,
   bankEducation,
   bankLanguage,
@@ -404,6 +405,7 @@ export async function createCvFromAdaptation(
   }
 
   const id = createId()
+  const adaptationId = createId()
   const finalTitle = title.trim() || DEFAULT_ADAPTED_CV_TITLE
 
   const queries: BatchItem<"pg">[] = [
@@ -429,7 +431,7 @@ export async function createCvFromAdaptation(
     // see `architecture/adaptation-corpus-scope` and `db/schema.ts`'s note
     // on the `adaptation` table.
     db.insert(adaptation).values({
-      id: createId(),
+      id: adaptationId,
       cvId: id,
       bankId: owned.bankId,
       jobPostingText: posting,
@@ -439,6 +441,15 @@ export async function createCvFromAdaptation(
       // say is genuinely the absence of a value.
       adaptationNotes:
         adaptationNotes.trim().slice(0, MAX_ADAPTATION_NOTES_CHARS) || null,
+    }),
+    // Every newly-created adaptation receives its application tracker in the
+    // same atomic batch. Manual applications use the same table with no
+    // adaptationId; this linked path preserves the CV provenance.
+    db.insert(application).values({
+      id: createId(),
+      userId,
+      adaptationId,
+      jobPostingText: posting,
     }),
   ]
 
@@ -563,6 +574,7 @@ export async function createCvFromBankAdaptation(
   }
 
   const id = createId()
+  const adaptationId = createId()
   const finalTitle = title.trim() || DEFAULT_ADAPTED_CV_TITLE
 
   const queries: BatchItem<"pg">[] = [
@@ -584,12 +596,18 @@ export async function createCvFromBankAdaptation(
     }),
     ...flattenSectionBatch(buildCvSectionQueries(id, finalDraft)),
     db.insert(adaptation).values({
-      id: createId(),
+      id: adaptationId,
       cvId: id,
       bankId: bankRow.id,
       jobPostingText: posting,
       adaptationNotes:
         adaptationNotes.trim().slice(0, MAX_ADAPTATION_NOTES_CHARS) || null,
+    }),
+    db.insert(application).values({
+      id: createId(),
+      userId,
+      adaptationId,
+      jobPostingText: posting,
     }),
   ]
 

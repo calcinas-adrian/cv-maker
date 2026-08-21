@@ -340,6 +340,54 @@ export const bankSkill = pgTable(
   ],
 )
 
+// Provenance record for the "Memorias" capture flow: a user writes free-form
+// text about a career achievement, AI drafts a bullet plus clarifying
+// questions, the user answers them, AI refines the draft, and the reviewed
+// result is saved as a `bank_material` (kind "bullet"). This row is that
+// event's paper trail — the raw input and the Q&A that shaped the final
+// wording — kept separate from `bank_material` because a material has no
+// concept of "how it was produced" and every OTHER way of creating one
+// (manual entry, CV promotion, import) has no such record either.
+//
+// `materialId` has NO foreign key, same convention as `cv_bullet.
+// sourceMaterialId` (see that column's note): it is a soft, informational
+// pointer to the bullet this memory produced, and it must survive that
+// material being soft-deleted without an FK error or a forced NULL write.
+// Deleting a memory record does NOT cascade-delete the material it points
+// at either — the two have independent lifecycles once the material exists.
+//
+// No `sortOrder`: memories are read newest-first by `createdAt`, not
+// manually reordered like the other bank_* lists.
+export const bankMemory = pgTable(
+  "bank_memory",
+  {
+    id: text("id").primaryKey(),
+    bankId: text("bank_id")
+      .notNull()
+      .references(() => bank.id, { onDelete: "cascade" }),
+    rawText: text("raw_text").notNull(),
+    clarifyingQuestions: jsonb("clarifying_questions")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    clarifyingAnswers: jsonb("clarifying_answers")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    aiNotes: text("ai_notes"),
+    materialId: text("material_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => [
+    index("bank_memory_bank_id_created_at_idx").on(
+      table.bankId,
+      table.createdAt,
+    ),
+  ],
+)
+
 /**
  * CV domain. `cv` is the top-level document, owned by a user and optionally
  * linked to the bank it was built from. `cv_experience`, `cv_project`,
@@ -639,6 +687,79 @@ export const adaptation = pgTable("adaptation", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 
+/** A user-owned tracker; adaptationId is optional for manual applications. */
+export const application = pgTable(
+  "application",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    adaptationId: text("adaptation_id").references(() => adaptation.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("saved"),
+    company: text("company"),
+    role: text("role"),
+    jobUrl: text("job_url"),
+    jobPostingText: text("job_posting_text"),
+    contactName: text("contact_name"),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
+    appliedAt: text("applied_at"),
+    followUpAt: text("follow_up_at"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("application_adaptation_id_unique").on(table.adaptationId),
+    index("application_user_id_created_at_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  ],
+)
+
+export const applicationInterview = pgTable(
+  "application_interview",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => application.id, { onDelete: "cascade" }),
+    scheduledAt: text("scheduled_at").notNull(),
+    kind: text("kind").notNull().default("interview"),
+    interviewer: text("interviewer"),
+    location: text("location"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("application_interview_application_id_scheduled_at_idx").on(
+      table.applicationId,
+      table.scheduledAt,
+    ),
+  ],
+)
+
+export const applicationOffer = pgTable("application_offer", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => application.id, { onDelete: "cascade" })
+    .unique(),
+  receivedAt: text("received_at").notNull(),
+  compensation: text("compensation"),
+  currency: text("currency"),
+  employmentType: text("employment_type"),
+  responseDueAt: text("response_due_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+})
 /**
  * BYOK (bring-your-own-key) AI provider configuration.
  *

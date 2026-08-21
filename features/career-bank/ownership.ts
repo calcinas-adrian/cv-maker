@@ -12,6 +12,7 @@ import {
   bankLanguage,
   bankMaterial,
   bankMaterialVariant,
+  bankMemory,
   bankSkill,
 } from "@/db/schema"
 import { findOwnedCv } from "@/features/cv/ownership"
@@ -271,6 +272,21 @@ export async function findOwnedSkill(id: string, bankId: string) {
         eq(bankSkill.id, id),
         eq(bankSkill.bankId, bankId),
         isNull(bankSkill.deletedAt),
+      ),
+    )
+    .limit(1)
+  return row ?? null
+}
+
+export async function findOwnedMemory(id: string, bankId: string) {
+  const [row] = await db
+    .select()
+    .from(bankMemory)
+    .where(
+      and(
+        eq(bankMemory.id, id),
+        eq(bankMemory.bankId, bankId),
+        isNull(bankMemory.deletedAt),
       ),
     )
     .limit(1)

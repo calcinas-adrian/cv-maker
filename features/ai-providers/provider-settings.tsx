@@ -36,7 +36,7 @@ import {
 import { ProviderKeyDialog } from "./provider-key-dialog"
 
 /**
- * Top-level client component for `/settings`. Receives the initial,
+ * Top-level client component for `/ai-providers`. Receives the initial,
  * already-masked list from the RSC page (`listProviderKeys` ran there with
  * the request's session) and re-fetches the same masked list after any
  * mutation — mirroring `features/cv/version-history.tsx`'s
@@ -254,7 +254,7 @@ function ModelList({
 
 /**
  * Inline "add another model to this credential" form. Explicit save, no
- * autosave — consistent with the rest of the settings surface.
+ * autosave — consistent with the rest of the provider management surface.
  *
  * Models already registered on this credential are filtered out of the
  * select so the duplicate case is mostly unreachable from the UI; the
