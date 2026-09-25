@@ -75,9 +75,15 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
       Known limitation: the PDF download is a plain link, so any render error (401/404/429/500)
       shows as a plain text page — pre-existing behavior, left as is.
       Evidence: writer tsc/lint/build exit 0; parent spot check tsc exit 0.
-- [ ] T4 Editor safety/clarity: confirm before restoring a version, rename/caption the YAML
+      Commit: 775e844.
+- [x] T4 Editor safety/clarity: confirm before restoring a version, rename/caption the YAML
       toggle, Spanish YAML/zod error messages, autosave failure recovery path.
-      Route: delegated writer.
+      Route: delegated writer (6 files + new `components/ui/tooltip.tsx`).
+      Restore dialog states the truth: restore does not snapshot the current draft
+      (`features/cv/actions.ts` restoreVersion), but it is undoable with Ctrl+Z in-session.
+      YAML toggle is now "Texto (avanzado)" with a tooltip; all yaml@2.9 error codes and
+      zod@4 issue codes mapped to Spanish; autosave error badge gets "Reintentar".
+      Evidence: writer tsc/lint/build exit 0; parent spot check tsc exit 0.
 - [ ] T5 Help text: bank section descriptions (incl. "variante"), AI providers why + where to
       get a key, login passkey explanation, translate error guidance. Route: delegated writer.
 - [ ] T6 Squash migrations into a single initial migration generated from the final schema.

@@ -4,6 +4,11 @@ import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Download, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { AdaptCvDialog } from "@/features/cv-adapt/adapt-dialog"
 import { TranslateCvDialog } from "@/features/cv-translate/translate-dialog"
 import type { CvData, CvTheme } from "@/schemas/cv.schema"
@@ -91,14 +96,14 @@ export function CvEditor({
   }, [])
 
   useUndoRedoShortcuts()
-  const { status } = useAutosave(cvId, initialUpdatedAt)
+  const { status, retry } = useAutosave(cvId, initialUpdatedAt)
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="flex items-center justify-between border-b p-4">
         <h1 className="text-lg font-medium">Editar CV</h1>
         <div className="flex items-center gap-3">
-          <AutosaveIndicator status={status} />
+          <AutosaveIndicator status={status} onRetry={retry} />
           <Button
             type="button"
             variant="outline"
@@ -143,14 +148,21 @@ export function CvEditor({
           >
             Formulario
           </Button>
-          <Button
-            type="button"
-            variant={activeView === "yaml" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveView("yaml")}
-          >
-            YAML
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={activeView === "yaml" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveView("yaml")}
+              >
+                Texto (avanzado)
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Editá el CV como texto. Si no estás seguro, usá Formulario.
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { debounce } from "es-toolkit"
 import { useEditorStore } from "./editor-store"
 import { saveDraft } from "./actions"
@@ -21,6 +21,11 @@ export function useAutosave(cvId: string, initialUpdatedAt: string) {
   const [status, setStatus] = useState<AutosaveStatus>("idle")
   const expectedUpdatedAtRef = useRef(initialUpdatedAt)
   const hasPendingChangesRef = useRef(false)
+  // Set inside the effect below (which has the `cancelled` closure an
+  // externally-triggered retry still needs to respect) and read from
+  // `retry`, which must stay a stable callback across re-renders — a fresh
+  // effect run per `cvId` change is fine, but the ref itself never resets.
+  const attemptSaveRef = useRef<(attempt: number) => void>(() => {})
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +58,8 @@ export function useAutosave(cvId: string, initialUpdatedAt: string) {
       setStatus("error")
     }
 
+    attemptSaveRef.current = (attempt) => void attemptSave(attempt)
+
     const debouncedSave = debounce(() => {
       void attemptSave(1)
     }, AUTOSAVE_DELAY_MS)
@@ -82,5 +89,12 @@ export function useAutosave(cvId: string, initialUpdatedAt: string) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [])
 
-  return { status }
+  // Manual re-entry after the automatic retries in `attemptSave` are
+  // exhausted (`status === "error"`) — starts a fresh attempt/backoff cycle
+  // from attempt 1, the same as the very first save.
+  const retry = useCallback(() => {
+    attemptSaveRef.current(1)
+  }, [])
+
+  return { status, retry }
 }

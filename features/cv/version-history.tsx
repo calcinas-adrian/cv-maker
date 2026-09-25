@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
   DialogBody,
@@ -35,6 +36,12 @@ export function VersionHistory({ cvId }: { cvId: string }) {
   const [label, setLabel] = useState("")
   const [restoringId, setRestoringId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  // The version pending confirmation, not the one currently restoring —
+  // `restoringId` (below) still tracks the in-flight restore itself, once
+  // confirmed.
+  const [restoreTarget, setRestoreTarget] = useState<VersionSummary | null>(
+    null,
+  )
   const hydrate = useEditorStore((s) => s.hydrate)
 
   async function refresh() {
@@ -129,7 +136,9 @@ export function VersionHistory({ cvId }: { cvId: string }) {
           <p className="text-muted-foreground text-sm">Cargando…</p>
         ) : versions.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            Todavía no hay versiones.
+            Todavía no hay versiones. Se crean con &quot;Nombrar esta
+            versión&quot; (arriba) o automáticamente como resguardo antes de
+            aplicar una importación desde GitHub.
           </p>
         ) : (
           versions.map((version) => (
@@ -150,7 +159,7 @@ export function VersionHistory({ cvId }: { cvId: string }) {
                 size="sm"
                 variant="outline"
                 disabled={restoringId === version.id}
-                onClick={() => handleRestore(version.id)}
+                onClick={() => setRestoreTarget(version)}
               >
                 Restaurar
               </Button>
@@ -158,6 +167,29 @@ export function VersionHistory({ cvId }: { cvId: string }) {
           ))
         )}
       </CardContent>
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreTarget(null)
+        }}
+        title="Restaurar esta versión"
+        description={
+          <>
+            Vas a reemplazar el contenido actual del editor por el de{" "}
+            <strong>{restoreTarget?.label ?? "Snapshot automático"}</strong>. Tu
+            versión actual no se guarda automáticamente antes de reemplazarla:
+            si te arrepentís, podés deshacerlo con Ctrl+Z mientras no recargues
+            ni cierres esta pestaña. Si preferís conservar el estado actual
+            antes de restaurar, cerrá esto y usá &quot;Nombrar esta
+            versión&quot; primero.
+          </>
+        }
+        confirmLabel="Restaurar"
+        pendingLabel="Restaurando…"
+        onConfirm={() => {
+          if (restoreTarget) return handleRestore(restoreTarget.id)
+        }}
+      />
     </Card>
   )
 }

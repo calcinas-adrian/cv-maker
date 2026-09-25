@@ -36,6 +36,12 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Eliminar",
+  // Separate from `confirmLabel` (rather than derived, e.g. `${confirmLabel}…`)
+  // because Spanish gerunds aren't a mechanical suffix of the infinitive/
+  // imperative ("Eliminar" -> "Eliminando", "Restaurar" -> "Restaurando" —
+  // no shared rule): every non-default `confirmLabel` needs its own pending
+  // text, so callers pass both instead of this component guessing one.
+  pendingLabel = "Eliminando…",
   cancelLabel = "Cancelar",
   onConfirm,
 }: {
@@ -44,6 +50,7 @@ export function ConfirmDialog({
   title: string
   description: React.ReactNode
   confirmLabel?: string
+  pendingLabel?: string
   cancelLabel?: string
   onConfirm: () => void | Promise<void>
 }) {
@@ -96,7 +103,7 @@ export function ConfirmDialog({
             disabled={pending}
             onClick={() => void handleConfirm()}
           >
-            {pending ? "Eliminando…" : confirmLabel}
+            {pending ? pendingLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
