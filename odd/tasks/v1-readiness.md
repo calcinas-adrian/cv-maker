@@ -93,8 +93,13 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
       produced; now mapped from `provider_not_configured` and surfaced with a link to
       `/ai-providers`.
       Evidence: writer tsc/lint/build exit 0; parent spot check tsc/lint exit 0.
-- [ ] T6 Squash migrations into a single initial migration generated from the final schema.
-      Route: inline (drizzle-kit generate).
+      Commit: 62d8441.
+- [x] T6 Squash migrations into a single initial migration generated from the final schema.
+      Route: inline (drizzle-kit generate). Only hand-written SQL found was the 0002
+      `INSERT INTO application ... SELECT FROM adaptation` backfill, irrelevant on a fresh DB.
+      Result: `db/migrations/0000_init.sql` (31 tables, matching 31 `pgTable` in schema).
+      Evidence: second `drizzle-kit generate` reports "No schema changes"; tsc, lint and
+      build exit 0; no spike routes in build output.
 
 ## Acceptance criteria
 
@@ -107,7 +112,9 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
 ## Progress
 
 - 2026-09-25: branch `feat/v1-readiness` created; document created.
+- 2026-09-25: T1-T6 done; all acceptance criteria met except the manual smoke run below.
 
 ## Next step
 
-T1 after the chain strategy is confirmed.
+Owner: recreate the Neon database, run `npx drizzle-kit migrate`, smoke-test the main
+flow in the browser, then decide on push and the four stacked PRs.

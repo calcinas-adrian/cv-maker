@@ -44,6 +44,52 @@ CREATE TABLE "ai_provider_model" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+CREATE TABLE "application" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"adaptation_id" text,
+	"status" text DEFAULT 'saved' NOT NULL,
+	"company" text,
+	"role" text,
+	"job_url" text,
+	"job_posting_text" text,
+	"contact_name" text,
+	"contact_email" text,
+	"contact_phone" text,
+	"applied_at" text,
+	"follow_up_at" text,
+	"notes" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"deleted_at" timestamp
+);
+--> statement-breakpoint
+CREATE TABLE "application_interview" (
+	"id" text PRIMARY KEY NOT NULL,
+	"application_id" text NOT NULL,
+	"scheduled_at" text NOT NULL,
+	"kind" text DEFAULT 'interview' NOT NULL,
+	"interviewer" text,
+	"location" text,
+	"notes" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "application_offer" (
+	"id" text PRIMARY KEY NOT NULL,
+	"application_id" text NOT NULL,
+	"received_at" text NOT NULL,
+	"compensation" text,
+	"currency" text,
+	"employment_type" text,
+	"response_due_at" text,
+	"notes" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "application_offer_application_id_unique" UNIQUE("application_id")
+);
+--> statement-breakpoint
 CREATE TABLE "bank" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -140,6 +186,19 @@ CREATE TABLE "bank_material_variant" (
 	"label" text,
 	"content" text NOT NULL,
 	"is_default" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"deleted_at" timestamp
+);
+--> statement-breakpoint
+CREATE TABLE "bank_memory" (
+	"id" text PRIMARY KEY NOT NULL,
+	"bank_id" text NOT NULL,
+	"raw_text" text NOT NULL,
+	"clarifying_questions" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"clarifying_answers" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"ai_notes" text,
+	"material_id" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"deleted_at" timestamp
@@ -279,6 +338,12 @@ CREATE TABLE "passkey" (
 	CONSTRAINT "passkey_credential_id_unique" UNIQUE("credential_id")
 );
 --> statement-breakpoint
+CREATE TABLE "rate_limit" (
+	"key" text PRIMARY KEY NOT NULL,
+	"window_start" timestamp with time zone NOT NULL,
+	"count" integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp NOT NULL,
@@ -316,6 +381,10 @@ ALTER TABLE "adaptation" ADD CONSTRAINT "adaptation_cv_id_cv_id_fk" FOREIGN KEY 
 ALTER TABLE "adaptation" ADD CONSTRAINT "adaptation_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ai_provider_key" ADD CONSTRAINT "ai_provider_key_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ai_provider_model" ADD CONSTRAINT "ai_provider_model_provider_key_id_ai_provider_key_id_fk" FOREIGN KEY ("provider_key_id") REFERENCES "public"."ai_provider_key"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "application" ADD CONSTRAINT "application_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "application" ADD CONSTRAINT "application_adaptation_id_adaptation_id_fk" FOREIGN KEY ("adaptation_id") REFERENCES "public"."adaptation"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "application_interview" ADD CONSTRAINT "application_interview_application_id_application_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."application"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "application_offer" ADD CONSTRAINT "application_offer_application_id_application_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."application"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank" ADD CONSTRAINT "bank_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank_credential" ADD CONSTRAINT "bank_credential_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank_education" ADD CONSTRAINT "bank_education_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -324,6 +393,7 @@ ALTER TABLE "bank_language" ADD CONSTRAINT "bank_language_bank_id_bank_id_fk" FO
 ALTER TABLE "bank_material" ADD CONSTRAINT "bank_material_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank_material" ADD CONSTRAINT "bank_material_engagement_id_bank_engagement_id_fk" FOREIGN KEY ("engagement_id") REFERENCES "public"."bank_engagement"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank_material_variant" ADD CONSTRAINT "bank_material_variant_material_id_bank_material_id_fk" FOREIGN KEY ("material_id") REFERENCES "public"."bank_material"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bank_memory" ADD CONSTRAINT "bank_memory_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bank_skill" ADD CONSTRAINT "bank_skill_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cv" ADD CONSTRAINT "cv_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cv" ADD CONSTRAINT "cv_bank_id_bank_id_fk" FOREIGN KEY ("bank_id") REFERENCES "public"."bank"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -340,6 +410,9 @@ ALTER TABLE "cv_version" ADD CONSTRAINT "cv_version_cv_id_cv_id_fk" FOREIGN KEY 
 ALTER TABLE "passkey" ADD CONSTRAINT "passkey_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "ai_provider_model_key_model_unique" ON "ai_provider_model" USING btree ("provider_key_id","model_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "application_adaptation_id_unique" ON "application" USING btree ("adaptation_id");--> statement-breakpoint
+CREATE INDEX "application_user_id_created_at_idx" ON "application" USING btree ("user_id","created_at");--> statement-breakpoint
+CREATE INDEX "application_interview_application_id_scheduled_at_idx" ON "application_interview" USING btree ("application_id","scheduled_at");--> statement-breakpoint
 CREATE INDEX "bank_credential_bank_id_sort_order_idx" ON "bank_credential" USING btree ("bank_id","sort_order");--> statement-breakpoint
 CREATE INDEX "bank_education_bank_id_sort_order_idx" ON "bank_education" USING btree ("bank_id","sort_order");--> statement-breakpoint
 CREATE INDEX "bank_engagement_bank_id_sort_order_idx" ON "bank_engagement" USING btree ("bank_id","sort_order");--> statement-breakpoint
@@ -348,6 +421,7 @@ CREATE INDEX "bank_material_bank_id_engagement_id_idx" ON "bank_material" USING 
 CREATE INDEX "bank_material_tech_tags_gin_idx" ON "bank_material" USING gin ("tech_tags");--> statement-breakpoint
 CREATE INDEX "bank_material_skill_tags_gin_idx" ON "bank_material" USING gin ("skill_tags");--> statement-breakpoint
 CREATE INDEX "bank_material_variant_material_id_sort_order_idx" ON "bank_material_variant" USING btree ("material_id","sort_order");--> statement-breakpoint
+CREATE INDEX "bank_memory_bank_id_created_at_idx" ON "bank_memory" USING btree ("bank_id","created_at");--> statement-breakpoint
 CREATE INDEX "bank_skill_bank_id_sort_order_idx" ON "bank_skill" USING btree ("bank_id","sort_order");--> statement-breakpoint
 CREATE INDEX "cv_bullet_experience_id_sort_order_idx" ON "cv_bullet" USING btree ("experience_id","sort_order");--> statement-breakpoint
 CREATE INDEX "cv_bullet_project_id_sort_order_idx" ON "cv_bullet" USING btree ("project_id","sort_order");--> statement-breakpoint
