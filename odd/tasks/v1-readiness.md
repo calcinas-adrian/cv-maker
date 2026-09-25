@@ -56,8 +56,13 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
       the database starts fresh, so no bookmarks exist; T2's not-found page covers it).
       Route: inline (mechanical deletions, 2 comment edits).
       Evidence: tsc exit 0, lint exit 0, build exit 0 with no spike/settings routes.
-- [ ] T2 Add custom `app/not-found.tsx`, `app/error.tsx`, `app/(dashboard)/error.tsx` in plain
-      Spanish with a way back to the dashboard. Route: inline.
+      Commit: 9d0a825.
+- [x] T2 Add custom `app/not-found.tsx`, `app/error.tsx`, `app/(dashboard)/error.tsx` in plain
+      Spanish with a way back to the dashboard (shared `components/error-fallback.tsx`;
+      raw error messages hidden, digest shown as reference). Also fixed `<html lang>` from
+      `en` to `es`. Route: inline (5 small files, no design ambiguity).
+      Evidence: tsc exit 0, lint exit 0, build exit 0; `/cv/[id]/edit` already calls
+      `notFound()`, so missing CVs now land on the Spanish page.
 - [ ] T3 Postgres-backed rate limiter (`lib/rate-limit.ts` + `rate_limit` table) applied to
       `renderCvPdf`, `extractCvFromFile`, `extractFromRepo`; friendly Spanish message.
       Route: delegated writer (2+ non-trivial files).
