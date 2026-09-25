@@ -858,3 +858,29 @@ export const aiProviderModel = pgTable(
     ),
   ],
 )
+
+/**
+ * Per-user, per-action rate limiter for expensive server work (PDF render,
+ * AI-backed file/GitHub import — see `lib/rate-limit.ts`). One row per
+ * `${action}:${userId}` pair, keyed by a single text primary key rather than
+ * a composite one so `consumeRateLimit` can do its whole check-and-increment
+ * in ONE `INSERT ... ON CONFLICT (key) DO UPDATE` statement: neon-http (this
+ * app's Postgres driver) has no transactions, so there is no other way to
+ * make "read the window, decide if it rolled over, write the new count"
+ * race-safe across concurrent requests for the same user — see
+ * `odd/tasks/v1-readiness.md`'s constraints.
+ *
+ * `windowStart` is deliberately `timestamptz`, unlike every naive
+ * `timestamp` column elsewhere in this file: it is compared against `now()`
+ * on every write to decide whether the window expired, and that comparison
+ * must not silently shift with the session's timezone setting.
+ *
+ * No `createdAt`/`updatedAt`/`deletedAt` here — this table is operational
+ * counter state, not user-facing content; a stale row is just a future
+ * upsert waiting to happen, never something a user could need to recover.
+ */
+export const rateLimit = pgTable("rate_limit", {
+  key: text("key").primaryKey(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull(),
+})

@@ -63,9 +63,18 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
       `en` to `es`. Route: inline (5 small files, no design ambiguity).
       Evidence: tsc exit 0, lint exit 0, build exit 0; `/cv/[id]/edit` already calls
       `notFound()`, so missing CVs now land on the Spanish page.
-- [ ] T3 Postgres-backed rate limiter (`lib/rate-limit.ts` + `rate_limit` table) applied to
+      Commit: 3bd76f3.
+- [x] T3 Postgres-backed rate limiter (`lib/rate-limit.ts` + `rate_limit` table) applied to
       `renderCvPdf`, `extractCvFromFile`, `extractFromRepo`; friendly Spanish message.
-      Route: delegated writer (2+ non-trivial files).
+      Route: delegated writer (2+ non-trivial files; mapping trigger).
+      Limits: render-pdf 30/10 min, import-file 10/60 min, import-github 10/60 min.
+      Single atomic `INSERT ... ON CONFLICT DO UPDATE` (neon-http has no transactions).
+      Render route maps `rate_limited` to HTTP 429 + `Retry-After`; import dialogs show the
+      Spanish message through their existing error step. Migration `0003_rate_limit` (to be
+      squashed in T6).
+      Known limitation: the PDF download is a plain link, so any render error (401/404/429/500)
+      shows as a plain text page — pre-existing behavior, left as is.
+      Evidence: writer tsc/lint/build exit 0; parent spot check tsc exit 0.
 - [ ] T4 Editor safety/clarity: confirm before restoring a version, rename/caption the YAML
       toggle, Spanish YAML/zod error messages, autosave failure recovery path.
       Route: delegated writer.

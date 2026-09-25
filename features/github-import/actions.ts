@@ -11,6 +11,7 @@ import { cv } from "@/db/schema"
 import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
 import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
+import { consumeRateLimit, rateLimitedResult } from "@/lib/rate-limit"
 import { getCvDraft } from "@/features/cv/actions"
 import {
   findPersonalBank,
@@ -143,6 +144,11 @@ export async function extractFromRepo(
   // ownership query duplicated in this file.
   const draftResult = await getCvDraft(cvId)
   if (!draftResult.ok) return draftResult
+
+  const rateLimitCheck = await consumeRateLimit("import-github", userId)
+  if (!rateLimitCheck.allowed) {
+    return rateLimitedResult(rateLimitCheck.retryAfterSeconds)
+  }
 
   const modelResult = await getConfiguredModelForUser(userId)
   if (!modelResult.ok) return modelResult

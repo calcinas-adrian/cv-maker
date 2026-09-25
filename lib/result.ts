@@ -22,7 +22,19 @@ export type ResultErrorCode =
   | "github_reauth_required"
   | "repo_too_large"
   | "digest_failed"
+  | "rate_limited"
   | "unknown"
 
 export type Result<T> =
-  { ok: true; data: T } | { ok: false; error: string; code: ResultErrorCode }
+  | { ok: true; data: T }
+  | {
+      ok: false
+      error: string
+      code: ResultErrorCode
+      // Only ever set alongside `code: "rate_limited"` (see
+      // `lib/rate-limit.ts`'s `rateLimitedResult`). An HTTP-facing caller
+      // (currently just `app/api/render/[cvId]/route.ts`) reads it to set a
+      // `Retry-After` header; every other caller ignores it and just shows
+      // `error`.
+      retryAfterSeconds?: number
+    }

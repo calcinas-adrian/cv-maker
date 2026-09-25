@@ -3,6 +3,8 @@ import path from "path"
 import { createRequire } from "node:module"
 import { getCvDraft } from "@/features/cv/actions"
 import { getCvTheme } from "@/features/cv/theme/actions"
+import { getSessionUserId } from "@/features/cv/ownership"
+import { consumeRateLimit, rateLimitedResult } from "@/lib/rate-limit"
 import type { Result } from "@/lib/result"
 import { DEFAULT_THEME } from "@/schemas/cv.schema"
 import { toTypstPayload, toThemePayload } from "@/features/render/typst-payload"
@@ -94,6 +96,21 @@ export type CvPdfRender = {
 export async function renderCvPdf(cvId: string): Promise<Result<CvPdfRender>> {
   const draft = await getCvDraft(cvId)
   if (!draft.ok) return draft
+
+  // `getCvDraft` above already confirmed both the session and cv ownership
+  // — re-deriving `userId` here (rather than threading it out of
+  // `getCvDraft`, which returns plain `CvData`) is the cheapest way to get
+  // a rate-limit key without changing that function's return shape. A null
+  // result here would mean the session vanished between the two calls,
+  // which the caller already treats as "unauthenticated" everywhere else.
+  const userId = await getSessionUserId()
+  if (!userId)
+    return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const rateLimitCheck = await consumeRateLimit("render-pdf", userId)
+  if (!rateLimitCheck.allowed) {
+    return rateLimitedResult(rateLimitCheck.retryAfterSeconds)
+  }
 
   const templateSource = await getTemplateSource()
   const payload = toTypstPayload(draft.data)

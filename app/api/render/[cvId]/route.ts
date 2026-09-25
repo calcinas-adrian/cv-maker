@@ -31,6 +31,17 @@ export async function GET(
       // as one 404 — a 403 would leak that a given cvId exists at all.
       return new NextResponse("No encontrado", { status: 404 })
     }
+    if (result.code === "rate_limited") {
+      // `retryAfterSeconds` always comes back set on this code — see
+      // `lib/rate-limit.ts`'s `rateLimitedResult`. `??` is only a defensive
+      // fallback against the field's optional type, never expected at
+      // runtime.
+      const retryAfterSeconds = result.retryAfterSeconds ?? 60
+      return new NextResponse(result.error, {
+        status: 429,
+        headers: { "Retry-After": String(retryAfterSeconds) },
+      })
+    }
     return new NextResponse("No se pudo generar el PDF", { status: 500 })
   }
 

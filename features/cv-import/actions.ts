@@ -10,6 +10,7 @@ import { cv } from "@/db/schema"
 import { getConfiguredModelForUser } from "@/lib/ai/get-user-model"
 import { inferCvLanguage } from "@/lib/ai/infer-language"
 import { translateAiError, unwrapRetryError } from "@/lib/ai/errors"
+import { consumeRateLimit, rateLimitedResult } from "@/lib/rate-limit"
 import type { Result } from "@/lib/result"
 import {
   buildCvSectionQueries,
@@ -69,6 +70,11 @@ export async function extractCvFromFile(
   const userId = await getSessionUserId()
   if (!userId)
     return { ok: false, error: "No autenticado", code: "unauthenticated" }
+
+  const rateLimitCheck = await consumeRateLimit("import-file", userId)
+  if (!rateLimitCheck.allowed) {
+    return rateLimitedResult(rateLimitCheck.retryAfterSeconds)
+  }
 
   const file = formData.get("file")
   if (!(file instanceof File)) {
