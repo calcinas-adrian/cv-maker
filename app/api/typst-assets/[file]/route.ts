@@ -6,11 +6,8 @@ import { NextResponse } from "next/server"
 // (`features/render/typst-client.ts`, Phase 3 of the "cv-editor-panel" SDD
 // change). Serves the two WASM binaries the browser compiler/renderer need
 // plus a runtime-fetched copy of the canonical `templates/classic.typ` —
-// the exact mechanism the Phase 0 spike proved works under
-// `next dev/build --turbopack` (see `app/api/typst-wasm-spike/[file]/route.ts`
-// and `sdd/cv-editor-panel/apply-progress`). This route supersedes the spike
-// route for real usage; the spike route is kept only as a historical
-// reference and is never imported from here.
+// the mechanism the Phase 0 spike proved works under
+// `next dev/build --turbopack` (see `sdd/cv-editor-panel/apply-progress`).
 //
 // Deliberately reads `templates/classic.typ` at request time instead of a
 // duplicated `public/templates/classic.typ` copy, per
@@ -24,12 +21,12 @@ const CLASSIC_TEMPLATE_PATH = path.join(
   "classic.typ",
 )
 
-// Same literal-switch-per-file shape as the spike route: Turbopack's Node
+// Literal switch per file on purpose: Turbopack's Node
 // File Trace (NFT) can only statically resolve a LITERAL
 // `path.join(process.cwd(), "a", "b")` call per branch. Building the path
 // from an indirected/dynamic segment made NFT fall back to tracing the
 // entire project as a "might be required" set, which then hard-failed the
-// build on `templates/classic.typ` — see the spike route's own comment and
+// build on `templates/classic.typ` — see
 // `sdd/cv-editor-panel/apply-progress` for the full repro.
 async function readAllowedFile(
   file: string,
