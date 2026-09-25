@@ -319,7 +319,9 @@ function AddModelForm({
             {available.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.label}
-                {!model.recommendedForExtraction ? " (básico)" : ""}
+                {!model.recommendedForExtraction
+                  ? " (menos preciso para extraer datos)"
+                  : ""}
               </SelectItem>
             ))}
           </SelectContent>

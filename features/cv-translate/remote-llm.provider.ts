@@ -44,8 +44,17 @@ export function createRemoteLlmProvider(
 
       // Turns a non-ok `Result` back into a thrown `TranslationError` so
       // the chain sees one uniform failure shape regardless of provider.
+      // `provider_not_configured` maps to the dedicated `"not_configured"`
+      // code so the dialog can offer a link to `/ai-providers` instead of a
+      // generic error — same distinction `import-from-file-dialog.tsx` and
+      // `adapt-dialog-shell.tsx` already make on their own `ResultErrorCode`.
       if (!result.ok) {
-        throw new TranslationError("provider_error", result.error)
+        throw new TranslationError(
+          result.code === "provider_not_configured"
+            ? "not_configured"
+            : "provider_error",
+          result.error,
+        )
       }
 
       return result.data.segments

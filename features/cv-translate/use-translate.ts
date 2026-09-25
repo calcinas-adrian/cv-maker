@@ -2,11 +2,12 @@
 
 import { useCallback, useState } from "react"
 import type { CvData } from "@/schemas/cv.schema"
-import type { Result, ResultErrorCode } from "@/lib/result"
+import type { Result } from "@/lib/result"
 import type {
   ProviderAvailability,
   TranslationLanguage,
 } from "@/lib/translate/types"
+import type { TranslateErrorCode } from "@/lib/translate/errors"
 import { applyCvSegments, collectCvSegments } from "@/lib/translate/cv-segments"
 import { runTranslationChain } from "@/lib/translate/chain"
 import { createBrowserTranslatorProvider } from "@/lib/translate/providers/browser-translator.provider"
@@ -34,7 +35,12 @@ export type TranslateStep =
   | {
       name: "error"
       message: string
-      code: ResultErrorCode | "all_providers_failed"
+      // The chain's own top-level code is always the fixed literal
+      // `"all_providers_failed"` — not actionable on its own. What the
+      // dialog needs is the LAST attempt's code (the paid LLM provider's),
+      // same reasoning `chain.ts` already uses for picking the last
+      // attempt's MESSAGE as the one worth showing.
+      code: TranslateErrorCode
     }
 
 const OTHER_LANGUAGE: Record<TranslationLanguage, TranslationLanguage> = {
@@ -157,7 +163,11 @@ export function useTranslate(cvId: string, initialTitle: string) {
     )
 
     if (!result.ok) {
-      setStep({ name: "error", message: result.error, code: result.code })
+      setStep({
+        name: "error",
+        message: result.error,
+        code: result.attempts.at(-1)?.code ?? "unknown",
+      })
       return
     }
 

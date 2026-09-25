@@ -258,7 +258,7 @@ export function ProviderKeyDialog({
                             <SelectItem key={model.id} value={model.id}>
                               {model.label}
                               {!model.recommendedForExtraction
-                                ? " (básico)"
+                                ? " (menos preciso para extraer datos)"
                                 : ""}
                             </SelectItem>
                           ))}

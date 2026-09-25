@@ -10,6 +10,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -467,6 +468,13 @@ export function MaterialSection({
     <Card>
       <CardHeader>
         <CardTitle>Material</CardTitle>
+        <CardDescription>
+          Viñetas y notas de resumen de tu trayectoria: la materia prima que
+          elegís a mano o que la IA usa como base al adaptar tu banco a un
+          aviso. Cada una puede tener más de una variante — una redacción
+          alternativa del mismo contenido — para elegir la que mejor encaje en
+          cada CV.
+        </CardDescription>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar

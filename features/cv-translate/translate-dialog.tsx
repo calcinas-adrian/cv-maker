@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Loader2Icon, LanguagesIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -246,7 +247,16 @@ export function TranslateCvDialog({
         ) : (
           <>
             <SheetBody>
-              <p className="text-destructive text-sm">{step.message}</p>
+              {step.code === "not_configured" ? (
+                <p className="text-sm">
+                  {step.message}{" "}
+                  <Link href="/ai-providers" className="underline">
+                    Configurar proveedor de IA
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-destructive text-sm">{step.message}</p>
+              )}
             </SheetBody>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={goToPick}>

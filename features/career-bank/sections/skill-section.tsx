@@ -10,6 +10,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -130,6 +131,11 @@ export function SkillSection({
     <Card>
       <CardHeader>
         <CardTitle>Habilidades</CardTitle>
+        <CardDescription>
+          Tus habilidades técnicas y blandas. Se suman a mano al armar un CV
+          desde el banco, o la IA elige y ajusta las más relevantes al adaptarlo
+          a un aviso.
+        </CardDescription>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar

@@ -10,6 +10,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -165,6 +166,10 @@ export function CredentialSection({
     <Card>
       <CardHeader>
         <CardTitle>Credenciales</CardTitle>
+        <CardDescription>
+          Certificaciones y premios que se suman a cualquier CV armado o
+          adaptado desde el banco.
+        </CardDescription>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar

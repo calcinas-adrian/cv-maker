@@ -64,6 +64,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <p className="text-muted-foreground text-xs">
+            ¿Primera vez? Iniciá sesión con GitHub. Después vas a poder agregar
+            una passkey (huella digital, rostro o PIN del dispositivo) desde el
+            panel principal, para entrar más rápido la próxima vez.
+          </p>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="passkey-email">Email</Label>
             <Input

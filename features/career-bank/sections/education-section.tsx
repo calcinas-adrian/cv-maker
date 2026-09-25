@@ -10,6 +10,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -140,6 +141,11 @@ export function EducationSection({
     <Card>
       <CardHeader>
         <CardTitle>Educación</CardTitle>
+        <CardDescription>
+          Tus estudios, disponibles para cualquier CV armado o adaptado desde el
+          banco — se copian tal cual los cargaste, ni la selección manual ni la
+          IA los reescriben.
+        </CardDescription>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar

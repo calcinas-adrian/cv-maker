@@ -84,8 +84,15 @@ page, test runner (owner declined; see Engram "No test runner for cv-ai").
       YAML toggle is now "Texto (avanzado)" with a tooltip; all yaml@2.9 error codes and
       zod@4 issue codes mapped to Spanish; autosave error badge gets "Reintentar".
       Evidence: writer tsc/lint/build exit 0; parent spot check tsc exit 0.
-- [ ] T5 Help text: bank section descriptions (incl. "variante"), AI providers why + where to
-      get a key, login passkey explanation, translate error guidance. Route: delegated writer.
+      Commit: ed19109.
+- [x] T5 Help text: bank section descriptions (incl. "variante"), AI providers why + where to
+      get a key, login passkey explanation, translate error guidance. Route: delegated writer
+      (13 files). Every explanation verified against code (education/credentials/languages are
+      copied verbatim, never AI-selected; skills and material reach the AI). "(básico)" became
+      "(menos preciso para extraer datos)". Translate: `not_configured` was declared but never
+      produced; now mapped from `provider_not_configured` and surfaced with a link to
+      `/ai-providers`.
+      Evidence: writer tsc/lint/build exit 0; parent spot check tsc/lint exit 0.
 - [ ] T6 Squash migrations into a single initial migration generated from the final schema.
       Route: inline (drizzle-kit generate).
 

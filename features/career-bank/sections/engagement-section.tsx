@@ -10,6 +10,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -366,6 +367,11 @@ export function EngagementSection({
     <Card>
       <CardHeader>
         <CardTitle>Trayectoria</CardTitle>
+        <CardDescription>
+          Tus empleos y proyectos. Agrupan las viñetas de Material y son la base
+          para armar un CV a mano o para que la IA arme uno nuevo al adaptar tu
+          banco a un aviso.
+        </CardDescription>
         <CardAction>
           <Button type="button" size="sm" onClick={openAddDialog}>
             <PlusIcon /> Agregar
