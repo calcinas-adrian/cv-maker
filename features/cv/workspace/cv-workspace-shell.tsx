@@ -12,6 +12,7 @@ import { useMediaQuery } from "@/hooks/use-media-query"
 import { Button } from "@/components/ui/button"
 import { TypstPreviewLazy } from "@/features/render/typst-preview-lazy"
 import { DocumentSkeleton } from "@/features/render/cv-preview-skeleton"
+import { CvWorkspaceShellSkeleton } from "@/features/cv/workspace/cv-workspace-shell-skeleton"
 import { useEditorStore } from "@/features/cv/editor-store"
 import type { CvListItem } from "@/features/cv/list"
 import { CvListSidebar } from "./cv-list-sidebar"
@@ -166,6 +167,10 @@ export function CvWorkspaceShell({
   // time — switching tabs only toggles `hidden`, so `CvEditor` never
   // remounts (and never loses unsaved state) just from tapping between
   // "Mis CVs" / "Editor" / "Vista previa".
+  // Viewport still unknown (server render + hydration render): show the
+  // skeleton rather than guessing a tree, so exactly one tree ever mounts.
+  if (isDesktop === null) return <CvWorkspaceShellSkeleton />
+
   if (!isDesktop) {
     return (
       <div className="flex h-full w-full flex-col">
