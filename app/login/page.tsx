@@ -16,10 +16,38 @@ import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
 import { mapPasskeyError } from "@/features/auth/passkey-errors"
 
+type PasskeySignInResult = Awaited<ReturnType<typeof authClient.signIn.passkey>>
+type Router = ReturnType<typeof useRouter>
+
+/**
+ * Shared by both sign-in paths below. A plain top-level function (rather
+ * than one declared inside the component) so the button handler and the
+ * autofill effect can both call it without pulling it into the effect's
+ * `react-hooks/exhaustive-deps` dependency array.
+ */
+async function handlePasskeySignInResult(
+  result: PasskeySignInResult,
+  router: Router,
+) {
+  if (result.data) {
+    toast.success("Sesión iniciada")
+    router.push("/dashboard")
+    router.refresh()
+    return
+  }
+
+  const mapped = mapPasskeyError(result.error, { flow: "sign-in" })
+  if (mapped) toast.error(mapped.message)
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [isGithubLoading, setIsGithubLoading] = useState(false)
-  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
+  // Covers BOTH sign-in paths: from the moment the button is clicked, or
+  // (for autofill) only once the user actually picked a credential — see the
+  // `fetchOptions.onRequest` hook below. Owner report: "no sé si fue exitoso
+  // o no" (T4, `odd/tasks/passkey-fixes.md`).
+  const [isPasskeyVerifying, setIsPasskeyVerifying] = useState(false)
   // Guards the autofill effect below against setting state or navigating
   // after this page unmounts (e.g. the user clicks the button and navigates
   // away before the silent autofill ceremony settles).
@@ -47,14 +75,30 @@ export default function LoginPage() {
         await window.PublicKeyCredential.isConditionalMediationAvailable()
       if (!isAvailable || unmountedRef.current) return
 
-      // Errors here stay silent: they fire whenever the button below starts
-      // its own ceremony (which aborts this one) or the user never engages
-      // the autofill dropdown at all.
-      const { data } = await authClient.signIn.passkey({ autoFill: true })
-      if (data && !unmountedRef.current) {
-        router.push("/dashboard")
-        router.refresh()
-      }
+      const result = await authClient.signIn.passkey({
+        autoFill: true,
+        fetchOptions: {
+          // Fires right before the verify-authentication POST — i.e. only
+          // once the browser resolved the picker and the user actually
+          // picked a credential, never while merely waiting on the
+          // dropdown. `client.mjs`'s `signInPasskey` spreads
+          // `opts.fetchOptions` into that one fetch call only, not the
+          // earlier options GET.
+          onRequest: () => {
+            if (!unmountedRef.current) setIsPasskeyVerifying(true)
+          },
+        },
+      })
+      if (unmountedRef.current) return
+      setIsPasskeyVerifying(false)
+
+      // A silent code here (see `mapPasskeyError`'s SILENT_CODES) covers the
+      // case where the button below started its own ceremony and aborted
+      // this one, or the user never engaged the autofill dropdown at all —
+      // any other error is still shown. Previously this effect only read
+      // `data` and dropped `error` entirely, which is exactly why a stale
+      // credential picked from autofill used to fail with no feedback.
+      await handlePasskeySignInResult(result, router)
     }
 
     void trySignInFromAutofill()
@@ -79,19 +123,11 @@ export default function LoginPage() {
   }
 
   async function handlePasskeySignIn() {
-    setIsPasskeyLoading(true)
-    try {
-      const { data, error } = await authClient.signIn.passkey()
-      if (data) {
-        router.push("/dashboard")
-        router.refresh()
-        return
-      }
-      const mapped = mapPasskeyError(error, { flow: "sign-in" })
-      if (mapped) toast.error(mapped.message)
-    } finally {
-      setIsPasskeyLoading(false)
-    }
+    setIsPasskeyVerifying(true)
+    const result = await authClient.signIn.passkey()
+    if (unmountedRef.current) return
+    setIsPasskeyVerifying(false)
+    await handlePasskeySignInResult(result, router)
   }
 
   return (
@@ -123,11 +159,11 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={isPasskeyLoading}
-            onClick={handlePasskeySignIn}
+            disabled={isPasskeyVerifying || isGithubLoading}
+            onClick={() => void handlePasskeySignIn()}
           >
-            {isPasskeyLoading
-              ? "Iniciando sesión…"
+            {isPasskeyVerifying
+              ? "Verificando passkey…"
               : "Iniciar sesión con una passkey"}
           </Button>
 
@@ -138,7 +174,7 @@ export default function LoginPage() {
 
           <Button
             type="button"
-            disabled={isGithubLoading}
+            disabled={isGithubLoading || isPasskeyVerifying}
             onClick={handleGithubSignIn}
           >
             {isGithubLoading ? "Redirigiendo…" : "Iniciar sesión con GitHub"}
