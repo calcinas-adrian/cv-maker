@@ -39,7 +39,12 @@ const nextConfig: NextConfig = {
   // the real `node_modules`, where `web-tree-sitter` loads the `.wasm`
   // files itself via `fs`/`WebAssembly.instantiate`, exactly like it does
   // in a plain Node CLI.
+  //
+  // `@napi-rs/canvas` is a native NAPI addon (see
+  // `features/cv-import/canvas-polyfill.ts`): externalized so Next traces and
+  // ships it as-is instead of trying to bundle its `.node` binary.
   serverExternalPackages: [
+    "@napi-rs/canvas",
     "typst-raster",
     "@myriaddreamin/typst-ts-node-compiler",
     "pdf-parse",
