@@ -23,7 +23,7 @@ function CvCardSkeleton({ titleClassName }: { titleClassName: string }) {
 
 /**
  * Mirrors `DashboardPage`'s shape: the "Tus CVs" header row (title +
- * `AddPasskeyButton`/`ImportFromFileDialog`/`CreateCvButton`) followed by a
+ * `PasskeyDialog`/`ImportFromFileDialog`/`CreateCvButton`) followed by a
  * handful of `DashboardCvList` card rows.
  */
 export default function DashboardLoading() {
@@ -32,7 +32,7 @@ export default function DashboardLoading() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Bar className="h-7 w-24" />
         <div className="flex flex-wrap items-center gap-2">
-          <Bar className="h-9 w-9" />
+          <Bar className="h-9 w-28" />
           <Bar className="h-9 w-32" />
           <Bar className="h-9 w-28" />
         </div>

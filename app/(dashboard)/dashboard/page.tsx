@@ -8,7 +8,7 @@ import { DashboardCvList } from "@/features/cv/dashboard-cv-list"
 import { ImportFromFileDialog } from "@/features/cv-import/import-from-file-dialog"
 import { BuildCvFromBankDialog } from "@/features/cv-from-bank/build-cv-dialog"
 import { AdaptFromBankDialog } from "@/features/cv-adapt/adapt-from-bank-dialog"
-import { AddPasskeyButton } from "./add-passkey-button"
+import { PasskeyDialog } from "@/features/auth/passkey-dialog"
 import { CreateCvButton } from "./create-cv-button"
 
 /**
@@ -121,7 +121,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-medium">Tus CVs</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <AddPasskeyButton />
+          <PasskeyDialog />
           <ImportFromFileDialog />
           <CreateCvButton />
         </div>
