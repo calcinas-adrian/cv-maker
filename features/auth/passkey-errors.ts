@@ -101,10 +101,15 @@ export function mapPasskeyError(
           "Por tu seguridad, agregar una passkey necesita un inicio de sesión reciente.",
       }
     case "PASSKEY_NOT_FOUND":
+      // Sign-in wording covers the stale-credential case (T5,
+      // `odd/tasks/passkey-fixes.md`): the browser still offered a
+      // credential the server has never seen, typically after a DB reset.
+      // `app/login/page.tsx` also calls `signalUnknownPasskey` alongside
+      // this message so the browser/OS stops offering it next time.
       return flow === "sign-in"
         ? {
             message:
-              "No encontramos esa passkey. Iniciá sesión con GitHub y agregala de nuevo.",
+              "Esa passkey ya no existe en el servidor (es de una cuenta anterior). Le pedimos al navegador que la quite; si sigue apareciendo, podés borrarla vos desde el gestor de contraseñas.",
           }
         : { message: "No encontramos esa passkey." }
     case "ERROR_INVALID_RP_ID":

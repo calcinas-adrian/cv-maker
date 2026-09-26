@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
-import { mapPasskeyError } from "@/features/auth/passkey-errors"
+import {
+  getPasskeyErrorCode,
+  mapPasskeyError,
+} from "@/features/auth/passkey-errors"
+import { signalUnknownPasskey } from "@/features/auth/passkey-signal"
 
 type PasskeySignInResult = Awaited<ReturnType<typeof authClient.signIn.passkey>>
 type Router = ReturnType<typeof useRouter>
@@ -23,7 +27,13 @@ type Router = ReturnType<typeof useRouter>
  * Shared by both sign-in paths below. A plain top-level function (rather
  * than one declared inside the component) so the button handler and the
  * autofill effect can both call it without pulling it into the effect's
- * `react-hooks/exhaustive-deps` dependency array.
+ * `react-hooks/exhaustive-deps` dependency array. `returnWebAuthnResponse:
+ * true` (both callers pass it) makes a failed result also carry
+ * `webauthn.response` whenever the WebAuthn ceremony itself succeeded — i.e.
+ * whenever the failure came back from the server (like `PASSKEY_NOT_FOUND`)
+ * rather than from the browser cancelling/aborting the ceremony. That's
+ * exactly the credential id needed to report a stale credential (T5,
+ * `odd/tasks/passkey-fixes.md`).
  */
 async function handlePasskeySignInResult(
   result: PasskeySignInResult,
@@ -38,6 +48,16 @@ async function handlePasskeySignInResult(
 
   const mapped = mapPasskeyError(result.error, { flow: "sign-in" })
   if (mapped) toast.error(mapped.message)
+
+  if (
+    getPasskeyErrorCode(result.error) === "PASSKEY_NOT_FOUND" &&
+    "webauthn" in result
+  ) {
+    void signalUnknownPasskey({
+      rpId: window.location.hostname,
+      credentialId: result.webauthn.response.id,
+    })
+  }
 }
 
 export default function LoginPage() {
@@ -77,6 +97,7 @@ export default function LoginPage() {
 
       const result = await authClient.signIn.passkey({
         autoFill: true,
+        returnWebAuthnResponse: true,
         fetchOptions: {
           // Fires right before the verify-authentication POST — i.e. only
           // once the browser resolved the picker and the user actually
@@ -95,9 +116,10 @@ export default function LoginPage() {
       // A silent code here (see `mapPasskeyError`'s SILENT_CODES) covers the
       // case where the button below started its own ceremony and aborted
       // this one, or the user never engaged the autofill dropdown at all —
-      // any other error is still shown. Previously this effect only read
-      // `data` and dropped `error` entirely, which is exactly why a stale
-      // credential picked from autofill used to fail with no feedback.
+      // any other error (e.g. a stale credential) is still shown. Previously
+      // this effect only read `data` and dropped `error` entirely, which is
+      // exactly why a stale credential picked from autofill used to fail
+      // with no feedback.
       await handlePasskeySignInResult(result, router)
     }
 
@@ -124,7 +146,9 @@ export default function LoginPage() {
 
   async function handlePasskeySignIn() {
     setIsPasskeyVerifying(true)
-    const result = await authClient.signIn.passkey()
+    const result = await authClient.signIn.passkey({
+      returnWebAuthnResponse: true,
+    })
     if (unmountedRef.current) return
     setIsPasskeyVerifying(false)
     await handlePasskeySignInResult(result, router)
