@@ -1,5 +1,7 @@
 import "server-only"
 
+// Must precede `pdf-parse`: provides the `DOMMatrix` global it needs at load.
+import "./canvas-polyfill"
 import { PDFParse, InvalidPDFException, PasswordException } from "pdf-parse"
 import mammoth from "mammoth"
 import type { Result } from "@/lib/result"
