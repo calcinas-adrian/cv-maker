@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { authClient } from "@/lib/auth-client"
 import { getPasskeyErrorCode, mapPasskeyError } from "./passkey-errors"
+import { getAuthenticatorLabel } from "./passkey-authenticators"
 
 /**
  * Pinned locale AND timeZone, matching
@@ -128,6 +129,13 @@ export function PasskeyDialog() {
             </p>
           )}
 
+          <p className="text-muted-foreground text-xs">
+            ¿Tu navegador o sistema te ofrece otras passkeys que no aparecen
+            acá? Son de antes y podés borrarlas manualmente: Chrome → Gestor de
+            contraseñas · Windows → Configuración → Cuentas → Claves de acceso ·
+            Apple → Contraseñas.
+          </p>
+
           <AddPasskeyForm onAdded={refresh} />
         </DialogBody>
       </DialogContent>
@@ -147,6 +155,16 @@ function PasskeyRow({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const busy = isSaving || isDeleting
+
+  // Best-effort provider label from the authenticator AAGUID (T6,
+  // `odd/tasks/passkey-fixes.md`) — used both as the title's fallback when
+  // the user never named the passkey, and as a small secondary tag when they
+  // did, so two passkeys aren't just "Notebook" and "Notebook 2".
+  const providerLabel = getAuthenticatorLabel(passkey.aaguid)
+  const displayName = passkey.name || providerLabel || "Passkey sin nombre"
+  const syncLabel = passkey.backedUp
+    ? "Sincronizada"
+    : "Solo en este dispositivo"
 
   async function handleRename() {
     const trimmed = name.trim()
@@ -220,11 +238,19 @@ function PasskeyRow({
         </div>
       ) : (
         <div className="min-w-0 flex-1">
-          <p className="min-w-0 truncate text-sm font-medium">
-            {passkey.name || "Passkey sin nombre"}
-          </p>
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <p className="min-w-0 truncate text-sm font-medium">
+              {displayName}
+            </p>
+            {passkey.name && providerLabel && (
+              <span className="text-muted-foreground shrink-0 text-xs">
+                ({providerLabel})
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground min-w-0 truncate text-xs">
-            Agregada el {DATE_FORMAT.format(new Date(passkey.createdAt))}
+            Agregada el {DATE_FORMAT.format(new Date(passkey.createdAt))} ·{" "}
+            {syncLabel}
           </p>
         </div>
       )}
@@ -271,14 +297,28 @@ function AddPasskeyForm({ onAdded }: { onAdded: () => void }) {
     const { data, error } = await authClient.passkey.addPasskey({
       name: trimmed || undefined,
     })
-    setIsAdding(false)
 
     if (data) {
+      // No name typed: default it to the detected provider (T6,
+      // `odd/tasks/passkey-fixes.md`) instead of leaving it unnamed — the
+      // server already returns the freshly-verified row, `aaguid` included,
+      // so no extra list round-trip is needed. Best-effort: if this rename
+      // fails, the row still falls back to the same provider label at
+      // render time (see `PasskeyRow`), so nothing is lost.
+      if (!trimmed) {
+        const label = getAuthenticatorLabel(data.aaguid)
+        if (label) {
+          await authClient.passkey.updatePasskey({ id: data.id, name: label })
+        }
+      }
+      setIsAdding(false)
       toast.success("Passkey agregada. La próxima vez podés entrar sin GitHub.")
       setName("")
       onAdded()
       return
     }
+
+    setIsAdding(false)
 
     // Adding a passkey requires a fresh session (see `lib/auth.ts`'s
     // `passkey` plugin); a GitHub session older than 24h lands here instead
