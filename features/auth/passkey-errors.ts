@@ -128,9 +128,8 @@ export function mapPasskeyError(
     case "FAILED_TO_UPDATE_PASSKEY":
       return { message: "No se pudo renombrar la passkey." }
     default:
-      return {
-        message:
-          error.message || "No se pudo completar la operación. Probá de nuevo.",
-      }
+      // Never fall back to `error.message`: it is English library text (and
+      // for sign-in always the generic "Auth cancelled").
+      return { message: "No se pudo completar la operación. Probá de nuevo." }
   }
 }
