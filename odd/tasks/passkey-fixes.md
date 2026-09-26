@@ -68,6 +68,30 @@ stale sessions, autofill redirect, passkey list/rename/delete. Out of scope: 1.7
       `listUserPasskeys` / `updatePasskey` / `deletePasskey`; `add-passkey-button.tsx` deleted.
       Evidence: tsc/lint/build exit 0. Commit: e299c8f.
 
+- [x] T4 Login feedback: visible progress while a passkey sign-in (button or autofill) is
+      being verified, success toast before redirect, mapped error otherwise. Owner report:
+      "no sé si fue exitoso o no".
+      Route: delegated writer. Autofill flips to "verificando" via verify-call `onRequest`
+      (fetchOptions only reach the verify POST, client.mjs:41); autofill no longer drops
+      `error`. Evidence: tsc/lint exit 0. Commit: bfd4903.
+- [x] T5 Stale passkeys (owner report: after the DB wipe, old passkeys still show in the
+      browser picker, choosing one does nothing): on `PASSKEY_NOT_FOUND` explain it and call
+      WebAuthn Signal API `PublicKeyCredential.signalUnknownCredential` with the credential
+      id used; after sign-in / when listing, call `signalAllAcceptedCredentials` if the
+      registered user handle is stable. Feature-detected; manual-removal help otherwise.
+      Route: delegated writer. Credential id from `returnWebAuthnResponse: true`; rpId =
+      `window.location.hostname`. Signal only on `PASSKEY_NOT_FOUND`, which the server raises
+      solely when the credentialID lookup misses (passkey `index.mjs:431`, parent-verified).
+      `signalAllAcceptedCredentials` skipped: better-auth mints a random user handle per
+      registration and never stores it (`index.mjs:159`). Chrome/Edge 132+ only.
+      Evidence: tsc/lint exit 0. Commit: 96cea3d.
+- [x] T6 Tell passkeys apart in the dashboard list: provider name from AAGUID (small map
+      of common providers), synced vs this-device (`backedUp`/`deviceType`), default name
+      on add from the provider.
+      Route: delegated writer. Client-safe `features/auth/passkey-authenticators.ts` (14
+      AAGUIDs from passkeydeveloper list; plugin's own map lives in a server-only entry).
+      Evidence: tsc/lint/build exit 0; no server crypto in client chunks. Commit: 8dda685.
+
 ## Acceptance criteria
 
 - No passkey call relies on `try/catch` for API failures.
@@ -81,6 +105,9 @@ stale sessions, autofill redirect, passkey list/rename/delete. Out of scope: 1.7
 - 2026-09-26: branch `fix/passkeys` created; document created.
 
 - 2026-09-26: T1-T3 done. WebAuthn ceremonies not exercised in a real browser.
+
+- 2026-09-26: owner browser test found T4-T6 issues; tasks added.
+- 2026-09-26: T4-T6 done; merged into local main. Browser re-test pending.
 
 ## Next step
 
