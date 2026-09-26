@@ -14,9 +14,9 @@ import { CvEditorSkeleton } from "@/features/cv/cv-editor-skeleton"
 export default function EditCvLoading() {
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="flex items-center justify-between border-b p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b p-4">
         <div className="bg-muted h-7 w-32 animate-pulse rounded-md" />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="bg-muted h-5 w-20 animate-pulse rounded-md" />
           <div className="bg-muted h-8 w-32 animate-pulse rounded-md" />
         </div>

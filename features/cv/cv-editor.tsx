@@ -100,9 +100,9 @@ export function CvEditor({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="flex items-center justify-between border-b p-4">
-        <h1 className="text-lg font-medium">Editar CV</h1>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b p-4">
+        <h1 className="min-w-0 text-lg font-medium">Editar CV</h1>
+        <div className="flex flex-wrap items-center gap-2">
           <AutosaveIndicator status={status} onRetry={retry} />
           <Button
             type="button"

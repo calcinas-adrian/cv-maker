@@ -30,30 +30,44 @@ function SidebarSkeleton() {
  * before any of it exists — so a full mockup is honest here, not a lie
  * about position. Static (no `react-resizable-panels`) since nothing is
  * interactive yet; widths mirror `CvWorkspaceShell`'s panel `defaultSize`s.
+ *
+ * Below `lg` this renders only an editor-shaped skeleton (full width, no
+ * sidebar/preview columns), matching `CvWorkspaceShell`'s mobile default
+ * pane ("Editor"). Both shapes are plain CSS (`hidden lg:flex` /
+ * `flex lg:hidden`) rather than a `useMediaQuery` check, since this
+ * component has no interactive state or side effects to double up on
+ * (unlike `CvWorkspaceShell` itself) — letting the browser's own media
+ * query pick one avoids any pre-hydration flash entirely.
  */
 export function CvWorkspaceShellSkeleton() {
   return (
-    <div className="flex h-full w-full">
-      <div className="h-full w-[22%] shrink-0 overflow-hidden border-r">
-        <SidebarSkeleton />
+    <>
+      <div className="hidden h-full w-full lg:flex">
+        <div className="h-full w-[22%] shrink-0 overflow-hidden border-r">
+          <SidebarSkeleton />
+        </div>
+        <div className="h-full w-[43%] shrink-0 overflow-hidden">
+          <CvEditorSkeleton />
+        </div>
+        <div className="h-full w-[35%] shrink-0 overflow-hidden border-l">
+          <DocumentSkeleton
+            experienceCount={2}
+            projectCount={1}
+            educationCount={1}
+            skillCount={1}
+            // 0 on purpose: this is the generic pre-hydration mockup, and
+            // most CVs have neither section — inventing blocks for them
+            // would make the placeholder taller than the document it
+            // stands in for.
+            credentialCount={0}
+            referenceCount={0}
+            className="h-full"
+          />
+        </div>
       </div>
-      <div className="h-full w-[43%] shrink-0 overflow-hidden">
+      <div className="flex h-full w-full lg:hidden">
         <CvEditorSkeleton />
       </div>
-      <div className="h-full w-[35%] shrink-0 overflow-hidden border-l">
-        <DocumentSkeleton
-          experienceCount={2}
-          projectCount={1}
-          educationCount={1}
-          skillCount={1}
-          // 0 on purpose: this is the generic pre-hydration mockup, and most
-          // CVs have neither section — inventing blocks for them would make
-          // the placeholder taller than the document it stands in for.
-          credentialCount={0}
-          referenceCount={0}
-          className="h-full"
-        />
-      </div>
-    </div>
+    </>
   )
 }
