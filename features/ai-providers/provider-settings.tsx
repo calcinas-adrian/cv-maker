@@ -202,8 +202,10 @@ function ModelList({
               key={m.id}
               className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
             >
-              <span className="flex items-center gap-2">
-                <span>{m.modelId}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="min-w-0 truncate" title={m.modelId}>
+                  {m.modelId}
+                </span>
                 {m.isDefault && (
                   <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                     <CheckIcon className="size-3" />

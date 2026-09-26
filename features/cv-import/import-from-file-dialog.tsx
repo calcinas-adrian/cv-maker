@@ -415,7 +415,7 @@ export function ImportFromFileDialog() {
                 idPrefix="file-import"
               />
               <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="import-fullName">Nombre completo</Label>
                     <Input

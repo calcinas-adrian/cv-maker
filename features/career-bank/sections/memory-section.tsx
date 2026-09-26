@@ -82,7 +82,7 @@ export function MemorySection({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     {defaultVariant ? (
-                      <p className="text-sm font-medium">
+                      <p className="text-sm font-medium break-words">
                         {defaultVariant.content}
                       </p>
                     ) : (

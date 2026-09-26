@@ -29,9 +29,9 @@ function CvCardSkeleton({ titleClassName }: { titleClassName: string }) {
 export default function DashboardLoading() {
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Bar className="h-7 w-24" />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Bar className="h-9 w-9" />
           <Bar className="h-9 w-32" />
           <Bar className="h-9 w-28" />

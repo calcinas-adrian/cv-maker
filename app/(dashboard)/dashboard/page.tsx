@@ -118,9 +118,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-medium">Tus CVs</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <AddPasskeyButton />
           <ImportFromFileDialog />
           <CreateCvButton />

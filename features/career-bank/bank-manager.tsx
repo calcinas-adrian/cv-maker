@@ -83,7 +83,7 @@ function BankProfileCard({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
           <CardContent className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="name"
@@ -130,7 +130,7 @@ function BankProfileCard({
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="location"

@@ -27,7 +27,7 @@ function BasicInfoCardSkeleton() {
         <Bar className="h-5 w-40" />
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FieldSkeleton labelClassName="w-24" />
           <FieldSkeleton labelClassName="w-12" />
           <FieldSkeleton labelClassName="w-16" />

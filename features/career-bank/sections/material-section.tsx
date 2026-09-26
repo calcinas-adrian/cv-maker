@@ -142,7 +142,7 @@ function MaterialForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
         <DialogBody className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="kind"
@@ -501,7 +501,7 @@ export function MaterialSection({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-medium break-words">
                       {defaultVariant?.content ?? "(sin contenido)"}
                     </p>
                     <p className="text-muted-foreground text-xs">
