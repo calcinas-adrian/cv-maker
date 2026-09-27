@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "node scripts/copy-typst-wasm.mjs && next dev --turbopack",
+    "build": "node scripts/copy-typst-wasm.mjs && next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
