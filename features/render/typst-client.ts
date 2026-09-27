@@ -21,6 +21,8 @@ import { toTypstPayload, toThemePayload } from "@/features/render/typst-payload"
  */
 
 const ASSET_BASE = "/api/typst-assets"
+// Static copies made by `scripts/copy-typst-wasm.mjs` before dev/build.
+const WASM_BASE = "/typst"
 const MAIN_FILE_PATH = "/main.typ"
 
 type TypstEngine = {
@@ -66,14 +68,14 @@ async function getEngine(): Promise<TypstEngine> {
 
       const compiler = createTypstCompiler()
       await compiler.init({
-        getModule: () => fetch(`${ASSET_BASE}/web-compiler.wasm`),
+        getModule: () => fetch(`${WASM_BASE}/web-compiler.wasm`),
         beforeBuild: [loadFonts(fontUrls)],
       })
       compiler.addSource(MAIN_FILE_PATH, templateSource)
 
       const renderer = createTypstRenderer()
       await renderer.init({
-        getModule: () => fetch(`${ASSET_BASE}/renderer.wasm`),
+        getModule: () => fetch(`${WASM_BASE}/renderer.wasm`),
       })
 
       return { compiler, renderer }

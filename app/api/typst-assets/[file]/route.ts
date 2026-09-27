@@ -2,12 +2,12 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { NextResponse } from "next/server"
 
-// Production asset delivery for the client-side Typst preview compiler
-// (`features/render/typst-client.ts`, Phase 3 of the "cv-editor-panel" SDD
-// change). Serves the two WASM binaries the browser compiler/renderer need
-// plus a runtime-fetched copy of the canonical `templates/classic.typ` —
-// the mechanism the Phase 0 spike proved works under
-// `next dev/build --turbopack` (see `sdd/cv-editor-panel/apply-progress`).
+// Serves a runtime-fetched copy of the canonical `templates/classic.typ` to
+// the client-side Typst preview compiler (`features/render/typst-client.ts`).
+// The two WASM binaries it also needs are static files in `public/typst/`
+// (copied by `scripts/copy-typst-wasm.mjs`): reading them from
+// `node_modules` here broke on Vercel, where pnpm's package symlinks aren't
+// shipped with the function.
 //
 // Deliberately reads `templates/classic.typ` at request time instead of a
 // duplicated `public/templates/classic.typ` copy, per
@@ -32,32 +32,6 @@ async function readAllowedFile(
   file: string,
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   switch (file) {
-    case "web-compiler.wasm": {
-      const buffer = await readFile(
-        path.join(
-          process.cwd(),
-          "node_modules",
-          "@myriaddreamin",
-          "typst-ts-web-compiler",
-          "pkg",
-          "typst_ts_web_compiler_bg.wasm",
-        ),
-      )
-      return { buffer, contentType: "application/wasm" }
-    }
-    case "renderer.wasm": {
-      const buffer = await readFile(
-        path.join(
-          process.cwd(),
-          "node_modules",
-          "@myriaddreamin",
-          "typst-ts-renderer",
-          "pkg",
-          "typst_ts_renderer_bg.wasm",
-        ),
-      )
-      return { buffer, contentType: "application/wasm" }
-    }
     case "classic-template.typ": {
       const buffer = await readFile(CLASSIC_TEMPLATE_PATH)
       return { buffer, contentType: "text/plain; charset=utf-8" }
@@ -83,8 +57,8 @@ export async function GET(
       "Content-Type": entry.contentType,
       "Content-Length": String(entry.buffer.length),
       // Moderate caching only: the URL has no content hash, so an
-      // `immutable` directive would risk serving a stale WASM binary
-      // across a deploy that bumps the exact-pinned typst.ts version.
+      // `immutable` directive would risk serving a stale template across a
+      // deploy that changes `templates/classic.typ`.
       "Cache-Control": "public, max-age=3600, must-revalidate",
     },
   })
