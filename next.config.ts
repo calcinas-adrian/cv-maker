@@ -21,7 +21,9 @@ const nextConfig: NextConfig = {
   // comment claimed build parity meant no fix was needed; that was testing
   // the wrong signal). Externalizing both packages makes Node load them
   // from their real `node_modules` location, where the relative worker
-  // path genuinely resolves.
+  // path genuinely resolves. That relative import is still invisible to
+  // file tracing, though, so on Vercel the worker file isn't shipped;
+  // `features/cv-import/pdf-worker.ts` imports it statically to fix that.
   //
   // `repomix` (the GitHub-import full-code digest pipeline,
   // `features/github-import/code-digest.ts`) resolves its tree-sitter
