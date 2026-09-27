@@ -1,7 +1,9 @@
 import "server-only"
 
-// Must precede `pdf-parse`: provides the `DOMMatrix` global it needs at load.
+// Must precede `pdf-parse`: provide the `DOMMatrix` global it needs at load
+// and the pdfjs worker it would otherwise import dynamically (untraceable).
 import "./canvas-polyfill"
+import "./pdf-worker"
 import { PDFParse, InvalidPDFException, PasswordException } from "pdf-parse"
 import mammoth from "mammoth"
 import type { Result } from "@/lib/result"
